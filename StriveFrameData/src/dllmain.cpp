@@ -85,6 +85,9 @@ int p2_act = 0;
 
 UE4SSProgram* Program;
 
+bool f2_pressed = false;
+bool f3_pressed = false;
+
 void(*UpdateBattle_Orig)(AREDGameState_Battle*, float);
 void UpdateBattle_New(AREDGameState_Battle* GameState, float DeltaTime) {
 	if (!GameCommon)
@@ -98,14 +101,30 @@ void UpdateBattle_New(AREDGameState_Battle* GameState, float DeltaTime) {
         return;
     }
 	
-	Program->register_keydown_event(Input::Key::F2, []
+	if (GetAsyncKeyState(VK_F2) & 0x8000)
 	{
-		ShouldUpdateBattle = !ShouldUpdateBattle;
-	});
-	Program->register_keydown_event(Input::Key::F3, []
+		if (!f2_pressed)
+		{
+			ShouldUpdateBattle = !ShouldUpdateBattle;
+			f2_pressed = true;
+		}
+	}
+	else
 	{
-        ShouldAdvanceBattle = true;
-	});
+		f2_pressed = false;
+	}
+	if (GetAsyncKeyState(VK_F3) & 0x8000)
+	{
+		if (!f3_pressed)
+		{
+			ShouldAdvanceBattle = true;
+			f3_pressed = true;
+		}
+	}
+	else
+	{
+		f3_pressed = false;
+	}
 
     if (ShouldUpdateBattle || ShouldAdvanceBattle)
 	{
@@ -155,7 +174,7 @@ void UpdateBattle_New(AREDGameState_Battle* GameState, float DeltaTime) {
 
             UObjectGlobals::FindAllOf(battle_trainingdamage_name, mod_actors);
 
-            if (mod_actors.size() < 1) return;
+            if (mod_actors.empty()) return;
             
             bp_function = mod_actors[0]->GetFunctionByNameInChain(STR("UpdateAdvantage"));
             MatchStartFlag = false;
