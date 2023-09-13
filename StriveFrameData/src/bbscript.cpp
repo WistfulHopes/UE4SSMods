@@ -51,63 +51,50 @@ namespace bbscript {
 	    }
 	}
 
-	void code_pointer::read_subroutine(char* name)
-	{
-		char cmn[4];
-		memcpy(cmn, ptr + 4, 3);
-		cmn[3] = 0;
-		for (int i = 0; i < 3; i++)
-			cmn[i] = std::tolower(cmn[i]);
-
-		char* subroutine_ptr;
-		if (strcmp(cmn, "cmn") == 0)
-		{
-			subroutine_ptr = reinterpret_cast<char*>(asw_engine::get()) + 2104;
-		}
-		else
-		{
-			subroutine_ptr = get_func_addr_base(base_ptr, name);
-		}
-	}
-
 	void code_pointer::execute_instruction(int code)
 	{
 		switch (code)
 		{
-		    case static_cast<int>(opcode::set_sprite):
-		    {
-		        int sprite_time = last_sprite_time = *reinterpret_cast<int*>(ptr + 36);
-		        state_remaining_time += sprite_time;
-		        break;
-		    }
-		    case static_cast<int>(opcode::call_subroutine):
-		    {
-		        char* subroutine_name = ptr + 4;
-		        if (strstr(subroutine_name, "Nandemo") != nullptr)
-		        {
-		            nandemo = true;
-		            state_remaining_time -= last_sprite_time;
-		        }
-		        break;
-		    }
-		    case static_cast<int>(opcode::set_sprite_time):
-		    {
-		        char* operand = ptr + 8;
-		        if (get_operand_value(owner, operand))
-		        {
-		            state_remaining_time -= last_sprite_time;
-		            last_sprite_time = *reinterpret_cast<int*>(ptr + 4);
-		            state_remaining_time += last_sprite_time;
-		        }
-		        break;
-		    }
-		    case static_cast<int>(opcode::sprite_time_add):
-		    {
-		        last_sprite_time += *reinterpret_cast<int*>(ptr + 4);
-		        state_remaining_time += *reinterpret_cast<int*>(ptr + 4);
-		        break;
-		    }
-		    
+		case static_cast<int>(opcode::set_sprite):
+			{
+				const int sprite_time = last_sprite_time = *reinterpret_cast<int*>(ptr + 36);
+				state_remaining_time += sprite_time;
+				break;
+			}
+		case static_cast<int>(opcode::call_subroutine):
+			{
+				char* subroutine_name = ptr + 4;
+				if (strstr(subroutine_name, "Nandemo") != nullptr)
+				{
+					nandemo = true;
+					state_remaining_time -= last_sprite_time;
+				}
+				break;
+			}
+		case static_cast<int>(opcode::set_sprite_time):
+			{
+				char* operand = ptr + 8;
+				if (get_operand_value(owner, operand))
+				{
+					state_remaining_time -= last_sprite_time;
+					last_sprite_time = *reinterpret_cast<int*>(ptr + 4);
+					state_remaining_time += last_sprite_time;
+				}
+				break;
+			}
+		case static_cast<int>(opcode::super_freeze):
+			{
+				const int self_freeze = last_sprite_time = *reinterpret_cast<int*>(ptr + 12);
+				last_sprite_time -= self_freeze;
+				state_remaining_time -= self_freeze;
+				break;
+			}
+		case static_cast<int>(opcode::sprite_time_add):
+			{
+				last_sprite_time += *reinterpret_cast<int*>(ptr + 4);
+				state_remaining_time += *reinterpret_cast<int*>(ptr + 4);
+				break;
+			}
             default: break;
         }
 	}
@@ -118,7 +105,7 @@ namespace bbscript {
 	    do
 	    {
 	        bool begin = true;
-	        for (auto BeginEndPair : BeginEndPairs)
+	        for (const auto BeginEndPair : BeginEndPairs)
 	        {
 	            if (*reinterpret_cast<int*>(ptr) == BeginEndPair[0])
 	            {
@@ -129,14 +116,14 @@ namespace bbscript {
 	        if (!begin)
 	            temp_indent = indent;
 	        bool end = true;
-	        for (auto BeginEndPair : BeginEndPairs)
+	        for (const auto BeginEndPair : BeginEndPairs)
 	        {
 	            if (*reinterpret_cast<int*>(ptr) == BeginEndPair[1])
 	            {
 	                end = false;
 	            }
 	        }
-	        unsigned int opcode_size = instruction_sizes[*reinterpret_cast<unsigned int*>(ptr)];
+	        const unsigned int opcode_size = instruction_sizes[*reinterpret_cast<unsigned int*>(ptr)];
 	        indent = temp_indent - 1;
 	        if (!end)
 	            indent = temp_indent;

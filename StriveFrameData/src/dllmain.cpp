@@ -173,13 +173,13 @@ void UpdateBattle_New(AREDGameState_Battle* GameState, float DeltaTime) {
             static auto battle_trainingdamage_name = Unreal::FName(STR("Battle_TrainingDamage_C"), Unreal::FNAME_Add);
 
             UObjectGlobals::FindAllOf(battle_trainingdamage_name, mod_actors);
-
-            if (mod_actors.empty()) return;
-            
+        	
             bp_function = mod_actors[0]->GetFunctionByNameInChain(STR("UpdateAdvantage"));
             MatchStartFlag = false;
         }
-	    
+    	
+    	if (mod_actors.empty()) return;
+
 	    UpdateAdvantage params = UpdateAdvantage();
 	    auto p1_string = std::to_wstring(p1_advantage);
 	    if (p1_advantage > 0)
@@ -241,7 +241,7 @@ public:
 
     	Program = &UE4SSProgram::get_program();
 
-	    const uint64_t UpdateBattle_Addr = sigscan::get().scan("\x48\x8B\x97\x88\x0B\x00\x00", "xxxxxxx") - 0x2B;
+	    const uint64_t UpdateBattle_Addr = sigscan::get().scan("\x40\x53\x57\x41\x54\x41\x55\x48\x81\xEC\x88\x00\x00\x00", "xxxxxxxxxxxxxx");
     	UpdateBattle_Detour = new PLH::x64Detour(
 			UpdateBattle_Addr, reinterpret_cast<uint64_t>(&UpdateBattle_New),
 			reinterpret_cast<uint64_t*>(&UpdateBattle_Orig));

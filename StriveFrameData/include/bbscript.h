@@ -45,6 +45,7 @@ namespace bbscript {
 		set_speed_mult = 207,
 		grab_or_release = 233,
 		hit = 234,
+		super_freeze = 271,
 		sprite_time_add = 2315,
 		MAX = 2596,
 	};
@@ -137,7 +138,6 @@ namespace bbscript {
 		}
 	    
 		void read_script();
-		void read_subroutine(char* name);
 		void execute_instruction(int code);
 	    void get_skip_begin_end_addr();
 		static char* get_func_addr_base(char* bbs_file, char* func_name);
