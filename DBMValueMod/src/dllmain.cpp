@@ -223,6 +223,8 @@ public:
     FIELD(0xC220, int, m_KizetsuTime);
     FIELD(0xC224, int, m_KizetsuTimeMax);
     FIELD(0xC26C, ID_CMNACT, m_CurCmnActionID);
+    FIELD(0xC7B0, int, m_DustHomingTime);
+    FIELD(0xC7B4, int, m_DustHomingSubTime);
     FIELD(0xC7FC, int, m_GuardBalance);
     char pad[0xC270];
     uint8_t m_InpFlag[2][333];
@@ -437,7 +439,7 @@ void ExecuteDamage_New(OBJ_CCharBase* pThis, OBJ_CCharBase* atObj, bool isAlread
     ExecuteDamage_Orig(pThis, atObj, isAlreadyDamage);
 
     if (pThis->m_KizetsuTime) return;
-    
+
     int ComboModifier;
     switch (pThis->m_ComboCount)
     {
@@ -496,7 +498,7 @@ void ExecuteDamage_New(OBJ_CCharBase* pThis, OBJ_CCharBase* atObj, bool isAlread
 bool (*OnFrameStep_Old)(OBJ_CCharBase* pThis);
 bool OnFrameStep_New(OBJ_CCharBase* pThis)
 {
-    if (pThis->m_KizetsuTime && pThis->m_CurCmnActionID == ID_CmnActKizetsu)
+    /*if (pThis->m_KizetsuTime && pThis->m_CurCmnActionID == ID_CmnActKizetsu)
     {
         --pThis->m_KizetsuTime;
         if (pThis->m_InpFlag[0][2] || pThis->m_InpFlag[1][2])
@@ -540,7 +542,17 @@ bool OnFrameStep_New(OBJ_CCharBase* pThis)
         }
     }
     if (pThis->m_KizetsuTime <= 0) pThis->m_KizetsuTime = 0;
-    if (pThis->m_KizetsuPoint <= 0) pThis->m_KizetsuPoint = 0;
+    if (pThis->m_KizetsuPoint <= 0) pThis->m_KizetsuPoint = 0;*/
+
+    if (pThis->m_DustHomingTime)
+    {
+        pThis->m_DustHomingTime--;
+    }
+    if (pThis->m_DustHomingSubTime)
+    {
+        pThis->m_DustHomingSubTime--;
+    }
+    
     return OnFrameStep_Old(pThis);
 };
 
@@ -681,7 +693,8 @@ public:
         const uintptr_t Address = FindPattern(BaseModule, (PBYTE)"\x8B\x88\x98\x06\x00\x00\xB8\x56\x55\x55\x55", "xxxxxxxxxxx") + 0x1B;
         DBMTable = *reinterpret_cast<int*>(Address + 0x2) + Address + 6 - 103 * 4;
         
-        // old tech
+        // Old Tech Mod
+
         const uintptr_t UkemiCheck_Address = FindPattern(BaseModule, (PBYTE)"\x40\x53\x56\x57\x41\x56\x48\x83\xEC\x38\x48\x8B\x05\x00\x00\x00\x00", "xxxxxxxxxxxxx????");
         
         UkemiCheck_Detour = new PLH::x64Detour(
@@ -689,12 +702,14 @@ public:
             reinterpret_cast<uint64_t*>(&UkemiCheck_Orig));
         UkemiCheck_Detour->hook();
 
+        // Stun Mod
+
         const uintptr_t ExecuteDamage_Address = FindPattern(BaseModule, (PBYTE)"\x8D\x0C\xBF\xC1\xE1\x04", "xxxxxx")- 0x1EE;
         
         ExecuteDamage_Detour = new PLH::x64Detour(
             ExecuteDamage_Address, reinterpret_cast<uint64_t>(&ExecuteDamage_New),
             reinterpret_cast<uint64_t*>(&ExecuteDamage_Orig));
-        ExecuteDamage_Detour->hook();
+        //ExecuteDamage_Detour->hook();
 
         const uintptr_t OnFrameStep_Address = FindPattern(BaseModule, (PBYTE)"\x75\x00\xE8\x00\x00\x00\x00\x44\x38\xA8\x84\x3C\x00\x00", "x?x????xxxxxxx")- 0x1247;
         
@@ -703,10 +718,12 @@ public:
             reinterpret_cast<uint64_t*>(&OnFrameStep_Old));
         OnFrameStep_Detour->hook();
         
-        IsCounterHitByGuardCounter_Detour = new PLH::x64Detour(
+        // RISC Counter Mod
+
+        /*IsCounterHitByGuardCounter_Detour = new PLH::x64Detour(
             reinterpret_cast<uintptr_t>(BaseModule) + 0xBF4A80, reinterpret_cast<uint64_t>(&IsCounterHitByGuardCounter_New),
             reinterpret_cast<uint64_t*>(&IsCounterHitByGuardCounter_Old));
-        IsCounterHitByGuardCounter_Detour->hook();
+        IsCounterHitByGuardCounter_Detour->hook();*/
         
         DWORD TechXFront;
         

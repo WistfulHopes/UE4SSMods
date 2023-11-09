@@ -12,7 +12,7 @@ const sigscan &sigscan::get()
 
 sigscan::sigscan(const char *name)
 {
-	const auto module = GetModuleHandle(name);
+	const auto module = GetModuleHandleA(name);
 	if (module == nullptr)
 		throw std::runtime_error("Module not found");
 
@@ -21,6 +21,7 @@ sigscan::sigscan(const char *name)
 	start = (uintptr_t)(info.lpBaseOfDll);
 	end = start + info.SizeOfImage;
 }
+
 #pragma comment(lib,"user32")
 uintptr_t sigscan::scan(const char *sig, const char *mask) const
 {
@@ -33,12 +34,6 @@ uintptr_t sigscan::scan(const char *sig, const char *mask) const
 				break;
 		}
 	}
-    char buffer[1024];
-    char *p = buffer;
-    for ( int i = 0; i < strlen(mask); i++ ) {
-        p += wsprintf( p, "%x ", ((unsigned char)sig[i]) & 0xFF );
-    }
-    MessageBox(0,"sigscan failed!",buffer,0);
 	throw std::runtime_error("Sigscan failed");
 }
 
