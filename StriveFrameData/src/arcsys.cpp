@@ -65,7 +65,7 @@ void ASWInitFunctions()
 asw_engine *asw_engine::get()
 {
     if (Class == nullptr)
-        Class = RC::UObjectGlobals::StaticFindObject<RC::UClass*>(nullptr, nullptr, STR("/Script/RED.REDGameState_Battle"));
+        Class = RC::UObjectGlobals::StaticFindObject<RC::UClass*>(nullptr, nullptr, STR(R"(/Script/RED.REDGameState_Battle)"));
 
     auto GameState = reinterpret_cast<AREDGameState_Battle*>((*GWorld)->GameState);
 
@@ -149,6 +149,21 @@ int asw_entity::pushbox_bottom() const
 void asw_entity::get_pushbox(int* left, int* top, int* right, int* bottom) const
 {
 	asw_entity_get_pushbox(this, left, top, right, bottom);
+}
+
+bool asw_player::is_startup()
+{
+    return !can_act() && !is_stunned() && !recovery;
+}
+
+bool asw_player::is_active()
+{
+    return !can_act() && !is_stunned() && attacking;
+}
+
+bool asw_player::is_recovery()
+{
+    return !can_act() && !is_stunned() && recovery;
 }
 
 int asw_player::calc_advantage()
@@ -333,9 +348,16 @@ bool asw_player::is_in_blockstun()
     }
 }
 
-bool asw_player::can_act()
+bool asw_player::can_act() const
 {
-    return enable_flag & ENABLE_NORMALATTACK;
+    return enable_flag & ENABLE_NORMALATTACK 
+        || enable_flag & ENABLE_FORWARDWALK
+        || cur_cmn_action_id == ID_CmnActBDash
+        || cur_cmn_action_id == ID_CmnActJumpPre
+        || cur_cmn_action_id == ID_CmnActJump
+        || cur_cmn_action_id == ID_CmnActJumpLanding
+        || cur_cmn_action_id == ID_CmnActAirFDash
+        || cur_cmn_action_id == ID_CmnActAirBDash;
 }
 
 bool asw_player::is_down_bound()
@@ -408,5 +430,6 @@ bool asw_player::is_guard_crush()
 
 bool asw_player::is_stunned()
 {
+    if (can_act()) return false;
     return is_in_hitstun() || is_in_blockstun() || is_knockdown() || is_roll() || is_stagger() || is_guard_crush();
 }

@@ -498,7 +498,7 @@ void ExecuteDamage_New(OBJ_CCharBase* pThis, OBJ_CCharBase* atObj, bool isAlread
 bool (*OnFrameStep_Old)(OBJ_CCharBase* pThis);
 bool OnFrameStep_New(OBJ_CCharBase* pThis)
 {
-    /*if (pThis->m_KizetsuTime && pThis->m_CurCmnActionID == ID_CmnActKizetsu)
+    if (pThis->m_KizetsuTime && pThis->m_CurCmnActionID == ID_CmnActKizetsu)
     {
         --pThis->m_KizetsuTime;
         if (pThis->m_InpFlag[0][2] || pThis->m_InpFlag[1][2])
@@ -542,7 +542,7 @@ bool OnFrameStep_New(OBJ_CCharBase* pThis)
         }
     }
     if (pThis->m_KizetsuTime <= 0) pThis->m_KizetsuTime = 0;
-    if (pThis->m_KizetsuPoint <= 0) pThis->m_KizetsuPoint = 0;*/
+    if (pThis->m_KizetsuPoint <= 0) pThis->m_KizetsuPoint = 0;
 
     if (pThis->m_DustHomingTime)
     {
@@ -683,6 +683,25 @@ public:
         {
             Output::send(STR("Failed to unpatch instant block window!\n"));
         }
+
+        // cell slow
+
+        DWORD CellSlowOverridew;
+
+        bool CellSlowOverridewSuccess = VirtualProtect(reinterpret_cast<LPVOID>(DBMTable + 0x257 * 4), 0x4, PAGE_READWRITE, &CellSlowOverridew);
+
+        if (CellSlowOverridewSuccess)
+        {
+            *reinterpret_cast<int*>(DBMTable + 0x257 * 4) = 1;
+
+            VirtualProtect(reinterpret_cast<LPVOID>(DBMTable + 0x257 * 4), 0x4, CellSlowOverridew, &CellSlowOverridew);
+
+            Output::send(STR("Successfully patched cell slow override!\n"));
+        }
+        else
+        {
+            Output::send(STR("Failed to patch cell slow override!\n"));
+        }
     }
 
     auto on_update() -> void override {}
@@ -695,7 +714,7 @@ public:
         
         // Old Tech Mod
 
-        const uintptr_t UkemiCheck_Address = FindPattern(BaseModule, (PBYTE)"\x40\x53\x56\x57\x41\x56\x48\x83\xEC\x38\x48\x8B\x05\x00\x00\x00\x00", "xxxxxxxxxxxxx????");
+        /*const uintptr_t UkemiCheck_Address = FindPattern(BaseModule, (PBYTE)"\x40\x53\x56\x57\x41\x56\x48\x83\xEC\x38\x48\x8B\x05\x00\x00\x00\x00", "xxxxxxxxxxxxx????");
         
         UkemiCheck_Detour = new PLH::x64Detour(
             UkemiCheck_Address, reinterpret_cast<uint64_t>(&UkemiCheck_New),
@@ -720,10 +739,10 @@ public:
         
         // RISC Counter Mod
 
-        /*IsCounterHitByGuardCounter_Detour = new PLH::x64Detour(
+        IsCounterHitByGuardCounter_Detour = new PLH::x64Detour(
             reinterpret_cast<uintptr_t>(BaseModule) + 0xBF4A80, reinterpret_cast<uint64_t>(&IsCounterHitByGuardCounter_New),
             reinterpret_cast<uint64_t*>(&IsCounterHitByGuardCounter_Old));
-        IsCounterHitByGuardCounter_Detour->hook();*/
+        IsCounterHitByGuardCounter_Detour->hook();
         
         DWORD TechXFront;
         
@@ -793,7 +812,7 @@ public:
         else
         {
             Output::send(STR("Failed to patch screen zoom scale!\n"));
-        }
+        }*/
         
         // instant block window
             
@@ -803,7 +822,7 @@ public:
 
         if (InstantBlockWindowSuccess)
         {
-            *reinterpret_cast<int*>(DBMTable + 0xAD * 4) = 6;
+            *reinterpret_cast<int*>(DBMTable + 0xAD * 4) = 4;
             
             VirtualProtect(reinterpret_cast<LPVOID>(DBMTable + 0xAD * 4), 0x4, InstantBlockWindow, &InstantBlockWindow);
             
@@ -812,6 +831,25 @@ public:
         else
         {
             Output::send(STR("Failed to patch instant block window!\n"));
+        }
+
+        // cell slow
+
+        DWORD CellSlowOverridew;
+
+        bool CellSlowOverridewSuccess = VirtualProtect(reinterpret_cast<LPVOID>(DBMTable + 0x257 * 4), 0x4, PAGE_READWRITE, &CellSlowOverridew);
+
+        if (CellSlowOverridewSuccess)
+        {
+            *reinterpret_cast<int*>(DBMTable + 0x257 * 4) = 1;
+
+            VirtualProtect(reinterpret_cast<LPVOID>(DBMTable + 0x257 * 4), 0x4, CellSlowOverridew, &CellSlowOverridew);
+
+            Output::send(STR("Successfully patched cell slow override!\n"));
+        }
+        else
+        {
+            Output::send(STR("Failed to patch cell slow override!\n"));
         }
     }
 };

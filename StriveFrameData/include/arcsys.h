@@ -37,6 +37,7 @@ public:
 	ARRAY_FIELD(0x0, player_block[2], players);
 	FIELD(0x8A0, int, entity_count);
 	ARRAY_FIELD(0xC10, class asw_entity* [107], entities);
+    FIELD(0x1364, int, super_freeze_self_timer);
 	ARRAY_FIELD(0x1498, RC::Unreal::AActor* [7], pawns);
 };
 
@@ -159,9 +160,11 @@ public:
 	FIELD(0x318, asw_entity*, attached);
     BIT_FIELD(0x390, 1, airborne);
 	BIT_FIELD(0x390, 256, counterhit);
+	BIT_FIELD(0x390, 0x40000000, recovery);
 	BIT_FIELD(0x394, 16, strike_invuln);
 	BIT_FIELD(0x394, 32, throw_invuln);
 	BIT_FIELD(0x394, 64, wakeup);
+	BIT_FIELD(0x398, 0x100, attacking);
 	FIELD(0x3A4, direction, facing);
 	FIELD(0x3A8, int, pos_x);
 	FIELD(0x3AC, int, pos_y);
@@ -408,16 +411,19 @@ enum ID_CMNACT : uint32_t
 class asw_player : public asw_entity {
 
 public:
-    FIELD(0x6080, int, enable_flag);
-    FIELD(0x60A0, int, blockstun);
-    FIELD(0x9868, int, hitstun);
-    FIELD(0xC26C, ID_CMNACT, cur_cmn_action_id);
-    FIELD(0xCF9C, int, slowdown_timer);
+    FIELD(0x60E0, int, enable_flag);
+    FIELD(0x6100, int, blockstun);
+    FIELD(0x98C8, int, hitstun);
+    FIELD(0xC2CC, ID_CMNACT, cur_cmn_action_id);
+    FIELD(0xCFFC, int, slowdown_timer);
 
+	bool is_startup();
+	bool is_active();
+	bool is_recovery();
     int calc_advantage();
     bool is_in_hitstun();
     bool is_in_blockstun();
-    bool can_act();
+    bool can_act() const;
     bool is_down_bound();
     bool is_quick_down_1();
     bool is_quick_down_2();

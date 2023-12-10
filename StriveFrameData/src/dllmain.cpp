@@ -4,6 +4,7 @@
 
 #include <UE4SSProgram.hpp>
 #include <UnrealDef.hpp>
+#include <AGameModeBase.hpp>
 #include <Mod/CppUserModBase.hpp>
 
 #define WIN32_LEAN_AND_MEAN
@@ -16,6 +17,9 @@ UREDGameCommon* GameCommon;
 
 typedef int(*GetGameMode_Func)(UREDGameCommon*);
 GetGameMode_Func GetGameMode;
+
+typedef bool(*IsPauseRED_Func)();
+IsPauseRED_Func IsPauseRED;
 
 enum GAME_MODE : int32_t
 {
@@ -49,21 +53,50 @@ enum GAME_MODE : int32_t
     GAME_MODE_INVALID = 0x1B,
 };
 
+enum class ESlateVisibility {
+	Visible = 0,
+	Collapsed = 1,
+	Hidden = 2,
+	HitTestInvisible = 3,
+	SelfHitTestInvisible = 4,
+	ESlateVisibility_MAX = 5,
+};
+
 bool ShouldUpdateBattle = true;
 bool ShouldAdvanceBattle = false;
+bool ShowFrameBar = false;
 
 struct UpdateAdvantage
 {
-    UpdateAdvantage()
-    {
-        Text = Unreal::FString(STR(""));
-    }
+	UpdateAdvantage()
+	{
+		Text = Unreal::FString(STR(""));
+	}
 
-    Unreal::FString Text;
+	Unreal::FString Text;
 };
 
-std::vector<Unreal::UObject*> mod_actors{};
-Unreal::UFunction* bp_function;
+struct SetFrames
+{
+	TArray<int> P1Frames = {};
+	TArray<int> P2Frames = {};
+};
+
+struct SetVisibility
+{
+	SetVisibility()
+	{
+		InVisibility = ESlateVisibility::Visible;
+	}
+
+	ESlateVisibility InVisibility;
+};
+
+std::vector<Unreal::UObject*> training_damage{};
+std::vector<Unreal::UObject*> training_frames{};
+Unreal::UFunction* updateadvantage_function;
+Unreal::UFunction* setframes_function;
+Unreal::UFunction* setvisibility_function;
 
 bool MatchStartFlag = false;
 
@@ -78,18 +111,42 @@ void MatchStart_New(AREDGameState_Battle* GameState)
 
 int p1_advantage = 0;
 int p2_advantage = 0;
-int p1_hitstop_prev = 0;
-int p2_hitstop_prev = 0;
-int p1_act = 0;
-int p2_act = 0;
+TArray<int> p1_frames = {};
+TArray<int> p2_frames = {};
 
 UE4SSProgram* Program;
 
 bool f2_pressed = false;
 bool f3_pressed = false;
+bool f4_pressed = false;
+
+void SetFrameBarVisibility(bool Visible) {
+	SetVisibility Params = SetVisibility();
+	if (Visible) 
+		Params.InVisibility = ESlateVisibility::Visible;
+	else
+		Params.InVisibility = ESlateVisibility::Collapsed;
+	training_frames[training_frames.size() - 1]->ProcessEvent(setvisibility_function, &Params);
+}
 
 void(*UpdateBattle_Orig)(AREDGameState_Battle*, float);
 void UpdateBattle_New(AREDGameState_Battle* GameState, float DeltaTime) {
+	if (MatchStartFlag)
+	{
+		p1_frames.Empty();
+		p2_frames.Empty();
+
+		static auto battle_trainingdamage_name = Unreal::FName(STR("Battle_TrainingDamage_C"), Unreal::FNAME_Add);
+		UObjectGlobals::FindAllOf(battle_trainingdamage_name, training_damage);
+		updateadvantage_function = training_damage[0]->GetFunctionByNameInChain(STR("UpdateAdvantage"));
+
+		static auto battle_trainingframes_name = Unreal::FName(STR("Battle_TrainingFrameData_C"), Unreal::FNAME_Add);
+		UObjectGlobals::FindAllOf(battle_trainingframes_name, training_frames);
+		setframes_function = training_frames[0]->GetFunctionByNameInChain(STR("SetFrames"));
+		setvisibility_function = training_frames[0]->GetFunctionByNameInChain(FName(STR("SetVisibility")));
+
+		MatchStartFlag = false;
+	}
 	if (!GameCommon)
 	{
 		GameCommon = reinterpret_cast<UREDGameCommon*>(UObjectGlobals::FindFirstOf(FName(STR("REDGameCommon"))));
@@ -97,6 +154,7 @@ void UpdateBattle_New(AREDGameState_Battle* GameState, float DeltaTime) {
 	}
     if (GetGameMode(GameCommon) != static_cast<int>(GAME_MODE_TRAINING))
     {
+		SetFrameBarVisibility(false);
         UpdateBattle_Orig(GameState, DeltaTime);
         return;
     }
@@ -125,86 +183,101 @@ void UpdateBattle_New(AREDGameState_Battle* GameState, float DeltaTime) {
 	{
 		f3_pressed = false;
 	}
+	if (GetAsyncKeyState(VK_F4) & 0x8000)
+	{
+		if (!f4_pressed)
+		{
+			ShowFrameBar = !ShowFrameBar;
+			SetFrameBarVisibility(ShowFrameBar);
+			f4_pressed = true;
+		}
+	}
+	else
+	{
+		f4_pressed = false;
+	}
+
 
     if (ShouldUpdateBattle || ShouldAdvanceBattle)
 	{
 		UpdateBattle_Orig(GameState, DeltaTime);
 		ShouldAdvanceBattle = false;
 
+		if (IsPauseRED()) return;
+
 	    const auto engine = asw_engine::get();
 	    if (!engine) return;
-	    if ((engine->players[0].entity->action_time == 1 && engine->players[0].entity->hitstop != p1_hitstop_prev - 1)
-	        || (engine->players[1].entity->action_time == 1 && engine->players[1].entity->hitstop != p2_hitstop_prev - 1))
-	    {
-	        if (!engine->players[0].entity->can_act() || !engine->players[1].entity->can_act())
-	        {
-	            if (!engine->players[1].entity->is_knockdown() || engine->players[1].entity->is_down_bound() || engine->players[1].entity->is_quick_down_1())
-	            {
-	                p1_advantage = engine->players[0].entity->calc_advantage() + p1_act;
-	            }
-	            if (!engine->players[0].entity->is_knockdown() || engine->players[0].entity->is_down_bound() || engine->players[0].entity->is_quick_down_1())
-	            {
-	                p2_advantage = engine->players[1].entity->calc_advantage() + p2_act;
-	            }
-	        }
-	        else
-	        {
-	            p1_advantage = p1_act - p2_act;
-	            p2_advantage = p2_act - p1_act;
-	        }
-	    }
 
-	    if (engine->players[0].entity->is_stunned() && !engine->players[1].entity->is_stunned())
-	        p1_advantage = -p2_advantage;
-	    else if (engine->players[1].entity->is_stunned() && !engine->players[0].entity->is_stunned())
-	        p2_advantage = -p1_advantage;
-	    
-	    p1_hitstop_prev = engine->players[0].entity->hitstop;
-	    p2_hitstop_prev = engine->players[1].entity->hitstop;
-	    if (engine->players[0].entity->can_act() && !engine->players[1].entity->can_act())
-	        p1_act++;
-	    else p1_act = 0;
-	    if (engine->players[1].entity->can_act() && !engine->players[0].entity->can_act())
-	        p2_act++;
-	    else p2_act = 0;
-
-        if (MatchStartFlag)
-        {
-            static auto battle_trainingdamage_name = Unreal::FName(STR("Battle_TrainingDamage_C"), Unreal::FNAME_Add);
-
-            UObjectGlobals::FindAllOf(battle_trainingdamage_name, mod_actors);
-        	
-            bp_function = mod_actors[0]->GetFunctionByNameInChain(STR("UpdateAdvantage"));
-            MatchStartFlag = false;
-        }
+		if (engine->players[0].entity->can_act() && !engine->players[1].entity->can_act()) p1_advantage++;
+	    else if (engine->players[1].entity->can_act() && !engine->players[0].entity->can_act()) p2_advantage++;
+		else if (!engine->players[1].entity->can_act() && !engine->players[0].entity->can_act())
+		{
+			p1_advantage = 0;
+			p2_advantage = 0;
+		}
+		else
+		{
+			if (p1_advantage == 0) p1_advantage = -p2_advantage;
+			else if (p2_advantage == 0) p2_advantage = -p1_advantage;
+		}
     	
-    	if (mod_actors.empty()) return;
+    	if (training_damage.empty()) return;
+    	if (training_frames.empty()) return;
 
-	    UpdateAdvantage params = UpdateAdvantage();
+		if (!engine->players[0].entity->can_act() || !engine->players[1].entity->can_act())
+		{
+			if (p1_frames.Num() > 63 || p2_frames.Num() > 63)
+			{
+				p1_frames.Empty();
+				p2_frames.Empty();
+			}
+
+			if (engine->super_freeze_self_timer > 0) return;
+
+			if (engine->players[0].entity->hitstop > 1 && engine->players[0].entity->is_active()) return;
+			if (engine->players[1].entity->hitstop > 1 && engine->players[1].entity->is_active()) return;
+
+			int p1_frame;
+			int p2_frame;
+
+			p1_frame = -1;
+			if (engine->players[0].entity->is_startup()) p1_frame = 0;
+			if (engine->players[0].entity->is_active()) p1_frame = 1;
+			if (engine->players[0].entity->is_recovery()) p1_frame = 2;
+			if (engine->players[0].entity->is_stunned()) p1_frame = 3;
+
+			p2_frame = -1;
+			if (engine->players[1].entity->is_startup()) p2_frame = 0;
+			if (engine->players[1].entity->is_active()) p2_frame = 1;
+			if (engine->players[1].entity->is_recovery()) p2_frame = 2;
+			if (engine->players[1].entity->is_stunned()) p2_frame = 3;
+
+			p1_frames.Add(p1_frame);
+			p2_frames.Add(p2_frame);
+
+			SetFrames setframes_params = SetFrames();
+			setframes_params.P1Frames = p1_frames;
+			setframes_params.P2Frames = p2_frames;
+			training_frames[training_frames.size() - 1]->ProcessEvent(setframes_function, &setframes_params);
+		}
+    	
+	    UpdateAdvantage updateadvantage_paramsp1 = UpdateAdvantage();
 	    auto p1_string = std::to_wstring(p1_advantage);
 	    if (p1_advantage > 0)
 	    {
 	        p1_string.insert(0, STR("+"));
 	    }
-	    if (p1_advantage > 1500 || p1_advantage < -1500)
-	    {
-	        p1_string = STR("???");
-	    }
-	    params.Text = FString(p1_string.c_str());
-	    mod_actors[mod_actors.size() - 1]->ProcessEvent(bp_function, &params);
+	    updateadvantage_paramsp1.Text = FString(p1_string.c_str());
+	    training_damage[training_damage.size() - 1]->ProcessEvent(updateadvantage_function, &updateadvantage_paramsp1);
 
 	    auto p2_string = std::to_wstring(p2_advantage);
 	    if (p2_advantage > 0)
 	    {
 	        p2_string.insert(0, STR("+"));
 	    }
-	    if (p2_advantage > 1500 || p2_advantage < -1500)
-	    {
-	        p2_string = STR("???");
-	    }
-	    UpdateAdvantage params2 = UpdateAdvantage();
-	    params2.Text = FString(p2_string.c_str());
-	    mod_actors[mod_actors.size() - 2]->ProcessEvent(bp_function, &params2);
+	    UpdateAdvantage updateadvantage_paramsp2 = UpdateAdvantage();
+	    updateadvantage_paramsp2.Text = FString(p2_string.c_str());
+	    training_damage[training_damage.size() - 2]->ProcessEvent(updateadvantage_function, &updateadvantage_paramsp2);
 	}
 }
 
@@ -253,9 +326,12 @@ public:
 			reinterpret_cast<uint64_t*>(&MatchStart_Orig));
     	MatchStart_Detour->hook();
 
-	    const uintptr_t GetGameMode_Addr = sigscan::get().scan("\x0F\xB6\x81\xF0\x02\x00\x00\xC3", "xxxxxxxx");
-    	GetGameMode = reinterpret_cast<GetGameMode_Func>(GetGameMode_Addr);
-    	
+		const uintptr_t GetGameMode_Addr = sigscan::get().scan("\x0F\xB6\x81\xF0\x02\x00\x00\xC3", "xxxxxxxx");
+		GetGameMode = reinterpret_cast<GetGameMode_Func>(GetGameMode_Addr);
+
+		const uintptr_t IsPauseRED_Addr = sigscan::get().scan("\x48\x8B\x88\x38\x02\x00\x00\xEB\x00\xF6\x05\x00\x00\x00\x00\x00", "xxxxxxxx?xx?????") - 0x10;
+		IsPauseRED = reinterpret_cast<IsPauseRED_Func>(*reinterpret_cast<int*>(IsPauseRED_Addr + 0x1) + IsPauseRED_Addr + 0x5);
+
     	ASWInitFunctions();
     	bbscript::BBSInitializeFunctions();
     }
