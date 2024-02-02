@@ -14,7 +14,17 @@ namespace RC::DotNetLibrary
     {
         Framework::Debug::Log(Level, Message);
     }
-
+    
+    void Runtime::add_unreal_init_callback(void (*Callback)())
+    {
+        unreal_init_callbacks.push_back(Callback);
+    }
+    
+    void Runtime::add_update_callback(void (*Callback)())
+    {
+        update_callbacks.push_back(Callback);
+    }
+    
     auto Runtime::initialize() -> void
     {
         int success = 0;
@@ -22,14 +32,14 @@ namespace RC::DotNetLibrary
 
         if (!success)
         {
-            Output::send<LogLevel::Warning>(STR("Failed to initialize CoreCLR\n"));
+            Output::send<LogLevel::Error>(STR("Failed to initialize CoreCLR\n"));
             CLR = nullptr;
             return;
         }
 
         if (!std::filesystem::exists(m_runtime_directory))
         {
-            Output::send<LogLevel::Warning>(STR("Could not find UE4SSDotNetRuntime\n"));
+            Output::send<LogLevel::Error>(STR("Could not find UE4SSDotNetRuntime\n"));
             CLR = nullptr;
             return;
         }
@@ -38,14 +48,15 @@ namespace RC::DotNetLibrary
 
         if (!std::filesystem::exists(runtime_config_path))
         {
-            Output::send<LogLevel::Warning>(STR("The runtime configuration does not exist for UE4SSDotNetRuntime\n"));
+            Output::send<LogLevel::Error>(STR("The runtime configuration does not exist for UE4SSDotNetRuntime\n"));
             CLR = nullptr;
             return;
         }
 
         if (!CLR->load_runtime(runtime_config_path))
         {
-            Output::send<LogLevel::Warning>(STR("Failed to load .NET Core Runtime\n"));
+            Output::send<LogLevel::Warning>(STR("Failed to load .NET Core Runtime.\n"
+                                              "If using Reloaded II, disregard this message."));
             CLR = nullptr;
             return;
         }
@@ -61,7 +72,7 @@ namespace RC::DotNetLibrary
                                                         nullptr,
                                                         reinterpret_cast<void**>(&ManagedCommand)))
         {
-            Output::send<LogLevel::Warning>(STR("Host runtime assembly loading failed\n"));
+            Output::send<LogLevel::Error>(STR("Host runtime assembly loading failed\n"));
             CLR = nullptr;
             return;
         }
@@ -79,7 +90,7 @@ namespace RC::DotNetLibrary
             }
             else
             {
-                Output::send<LogLevel::Warning>(STR("Host runtime assembly initialization failed!\n"));
+                Output::send<LogLevel::Error>(STR("Host runtime assembly initialization failed!\n"));
                 CLR = nullptr;
                 return;
             }
@@ -122,11 +133,15 @@ namespace RC::DotNetLibrary
     auto Runtime::fire_unreal_init() -> void
     {
         if (Shared::Events[UnrealInit]) ManagedCommand(Command(Shared::Events[UnrealInit]));
+
+        for (const auto callback : unreal_init_callbacks) callback();
     }
 
     auto Runtime::fire_update() -> void
     {
         if (Shared::Events[Update]) ManagedCommand(Command(Shared::Events[Update]));
+
+        for (const auto callback : update_callbacks) callback();
     }
 
     namespace Framework
@@ -144,7 +159,7 @@ namespace RC::DotNetLibrary
                                                                                                                                                                 \
             *prop->ContainerPtrToValuePtr<Type>(Object) = Value;                                                                                                   \
             return true;
-
+        
         intptr_t Hooking::SigScan(const char* Signature)
         {
             intptr_t address = 0;
@@ -173,17 +188,13 @@ namespace RC::DotNetLibrary
             return hook;
         }
 
-        CallbackId Hooking::HookUFunctionPre(const char* Name, const UnrealScriptFunctionCallable& PreCallback, void* CustomData)
+        CallbackId Hooking::HookUFunctionPre(UFunction* function, const UnrealScriptFunctionCallable& PreCallback, void* CustomData)
         {
-            auto function = static_cast<UFunction*>(UObjectGlobals::FindFirstOf(to_wstring(Name)));
-            if (!function) return -1;
             return function->RegisterPreHook(PreCallback, CustomData);
         }
 
-        CallbackId Hooking::HookUFunctionPost(const char* Name, const UnrealScriptFunctionCallable& PostCallback, void* CustomData)
+        CallbackId Hooking::HookUFunctionPost(UFunction* function, const UnrealScriptFunctionCallable& PostCallback, void* CustomData)
         {
-            auto function = static_cast<UFunction*>(UObjectGlobals::FindFirstOf(to_wstring(Name)));
-            if (!function) return -1;
             return function->RegisterPostHook(PostCallback, CustomData);
         }
 
@@ -192,10 +203,8 @@ namespace RC::DotNetLibrary
             if (Hook) Hook->unHook();
         }
 
-        bool Hooking::UnhookUFunction(const char* Name, CallbackId CallbackId)
+        bool Hooking::UnhookUFunction(UFunction* function, CallbackId CallbackId)
         {
-            auto function = static_cast<UFunction*>(UObjectGlobals::FindFirstOf(to_wstring(Name)));
-            if (!function) return false;
             return function->UnregisterHook(CallbackId);
         }
 
@@ -234,6 +243,11 @@ namespace RC::DotNetLibrary
         }
 
         UObject* Object::Find(const char* Name)
+        {
+            return UObjectGlobals::StaticFindObject(nullptr, nullptr, to_wstring(Name));
+        }
+
+        UObject* Object::FindFirstOf(const char* Name)
         {
             return UObjectGlobals::FindFirstOf(to_wstring(Name));
         }

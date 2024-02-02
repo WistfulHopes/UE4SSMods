@@ -214,10 +214,17 @@ namespace RC::DotNetLibrary
 
         static inline CoreCLR* CLR;
 
+        static inline std::vector<void(*)()> unreal_init_callbacks;
+        static inline std::vector<void(*)()> update_callbacks;
+
     public:
         Runtime(std::wstring runtime_directory) : m_runtime_directory(runtime_directory) {}
 
         static auto log(LogLevel::LogLevel Level, const char* Message);
+
+        static void add_unreal_init_callback(void (*Callback)());
+        static void add_update_callback(void (*Callback)());
+        
         auto initialize() -> void;
         auto load_assemblies() -> void;
         auto unload_assemblies() -> void;
@@ -296,7 +303,7 @@ namespace RC::DotNetLibrary
             uint32 Length;
             PropertyType Type;
         };
-
+        
         class CSHARPLOADER_API Debug
         {
         public:
@@ -308,10 +315,10 @@ namespace RC::DotNetLibrary
         public:
             static intptr_t SigScan(const char* Signature);
             static PLH::x64Detour* Hook(uint64_t fnAddress, uint64_t fnCallback, uint64_t* userTrampVar);
-            static CallbackId HookUFunctionPre(const char* Name, const UnrealScriptFunctionCallable& PreCallback, void* CustomData);
-            static CallbackId HookUFunctionPost(const char* Name, const UnrealScriptFunctionCallable& PostCallback, void* CustomData);
+            static CallbackId HookUFunctionPre(UFunction* function, const UnrealScriptFunctionCallable& PreCallback, void* CustomData);
+            static CallbackId HookUFunctionPost(UFunction* function, const UnrealScriptFunctionCallable& PostCallback, void* CustomData);
             static void Unhook(PLH::x64Detour* Hook);
-            static bool UnhookUFunction(const char* Name, CallbackId CallbackId);
+            static bool UnhookUFunction(UFunction* function, CallbackId CallbackId);
         };
 
 
@@ -321,6 +328,7 @@ namespace RC::DotNetLibrary
             static bool IsValid(UObject* Object);
             static void Invoke(UObject* Object, UFunction* Function, void* Params);
             static UObject* Find(const char* Name);
+            static UObject* FindFirstOf(const char* Name);
             static void GetFullName(UObject* Object, char* Name);
             static void GetName(UObject* Object, char* Name);
             static void GetClass(UObject* Object, UClass** Class);
