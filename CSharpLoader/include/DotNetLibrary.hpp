@@ -30,26 +30,12 @@ using namespace RC::Unreal;
 #define CSHARPLOADER_API __declspec(dllexport)
 namespace RC::DotNetLibrary
 {
-    enum struct CallbackType : int32_t
-    {
-        ActorOverlapDelegate,
-        ActorHitDelegate,
-        ActorCursorDelegate,
-        ActorKeyDelegate,
-        ComponentOverlapDelegate,
-        ComponentHitDelegate,
-        ComponentCursorDelegate,
-        ComponentKeyDelegate,
-        CharacterLandedDelegate
-    };
-
     enum struct ArgumentType : int32_t
     {
         None,
         Single,
         Integer,
         Pointer,
-        Callback
     };
 
     enum struct CommandType : int32_t
@@ -102,25 +88,12 @@ namespace RC::DotNetLibrary
         static inline std::unordered_map<int32_t, PropertyType> m_property_type_map;
     };
 
-    struct Callback
-    {
-        void** Parameters;
-        CallbackType Type;
-
-        FORCEINLINE Callback(void** Parameters, CallbackType Type)
-        {
-            this->Parameters = Parameters;
-            this->Type = Type;
-        }
-    };
-
     struct Argument
     {
         union {
             float Single;
             uint32_t Integer;
             void* Pointer;
-            Callback Callback;
         };
         ArgumentType Type;
 
@@ -140,12 +113,6 @@ namespace RC::DotNetLibrary
         {
             this->Pointer = Value;
             this->Type = !Value ? ArgumentType::None : ArgumentType::Pointer;
-        }
-
-        FORCEINLINE Argument(DotNetLibrary::Callback Value)
-        {
-            this->Callback = Value;
-            this->Type = ArgumentType::Callback;
         }
     };
 
@@ -202,9 +169,8 @@ namespace RC::DotNetLibrary
         }
     };
 
-    static_assert(sizeof(Callback) == 16, "Invalid size of the [Callback] structure");
-    static_assert(sizeof(Argument) == 24, "Invalid size of the [Argument] structure");
-    static_assert(sizeof(Command) == 40, "Invalid size of the [Command] structure");
+    static_assert(sizeof(Argument) == 16, "Invalid size of the [Argument] structure");
+    static_assert(sizeof(Command) == 32, "Invalid size of the [Command] structure");
 
     static void* (*ManagedCommand)(Command);
 
@@ -309,18 +275,55 @@ namespace RC::DotNetLibrary
         public:
             static void Log(LogLevel::LogLevel Level, const char* Message);
         };
+        
+        using UFunctionCallback = void(*)(UObject* pThis, void* parms, void* out_parms, void* return_val);
+        
+        struct CSharpUnrealScriptFunctionData
+        {
+            Unreal::CallbackId pre_callback_id;
+            Unreal::CallbackId post_callback_id;
+            Unreal::UFunction* unreal_function;
+            UFunctionCallback callback_ref;
+            UFunctionCallback post_callback_ref;
+            
+            bool has_return_value{};
+            // Will be non-nullptr if the UFunction has a return value
+            Unreal::FProperty* return_property{};
+        };
+        struct CSharpCallbackData
+        {
+            struct RegistryIndex
+            {
+                UFunctionCallback callback_ref;
+                Unreal::CallbackId callback_id;
+            };
+            Unreal::UClass* instance_of_class;
+            std::vector<RegistryIndex> registry_indexes;
+        };
+        
+        static std::vector<std::unique_ptr<CSharpUnrealScriptFunctionData>> g_hooked_script_function_data{};
+        static inline std::unordered_map<int32_t, int32_t> m_generic_hook_id_to_native_hook_id{};
+        static inline int32_t m_last_generic_hook_id{};
+        static inline std::unordered_map<StringType, CSharpCallbackData> m_script_hook_callbacks{};
 
+        struct CallbackIds
+        {
+            CallbackId pre_id;
+            CallbackId post_id;
+        };
+        
         class CSHARPLOADER_API Hooking
         {
+        private:
+            static void CSharpUnrealScriptFunctionHookPre(Unreal::UnrealScriptFunctionCallableContext context, void* custom_data);
+            static void CSharpUnrealScriptFunctionHookPost(Unreal::UnrealScriptFunctionCallableContext context, void* custom_data);
         public:
             static intptr_t SigScan(const char* Signature);
             static PLH::x64Detour* Hook(uint64_t fnAddress, uint64_t fnCallback, uint64_t* userTrampVar);
-            static CallbackId HookUFunctionPre(UFunction* function, const UnrealScriptFunctionCallable& PreCallback, void* CustomData);
-            static CallbackId HookUFunctionPost(UFunction* function, const UnrealScriptFunctionCallable& PostCallback, void* CustomData);
+            static CallbackIds HookUFunction(UFunction* function, UFunctionCallback pre_callback, UFunctionCallback post_callback);
             static void Unhook(PLH::x64Detour* Hook);
-            static bool UnhookUFunction(UFunction* function, CallbackId CallbackId);
+            static void UnhookUFunction(UFunction* function, CallbackIds callback_ids);
         };
-
 
         class CSHARPLOADER_API Object
         {
@@ -399,6 +402,14 @@ namespace RC::DotNetLibrary
             static void EditNameAt(UEnum* Enum, int Index, char* Name);
             static void EditValueAt(UEnum* Enum, int Index, int64 Value);
             static void RemoveFromNamesAt(UEnum* Enum, int Index, int Count = 1, bool AllowShrinking = true);
+        };
+        
+        class CSHARPLOADER_API Function : public Struct
+        {
+            static int GetParmsSize(UFunction* Func);
+            static int GetOffsetOfParam(UFunction* Func, const char* Name);
+            static int GetSizeOfParam(UFunction* Func, const char* Name);
+            static int GetReturnValueOffset(UFunction* Func);
         };
     } 
 }

@@ -1,5 +1,7 @@
 #include <polyhook2/Detour/x64Detour.hpp>
 #include "DotNetLibrary.hpp"
+
+#include <stack>
 #include <UnrealDef.hpp>
 #include <Unreal/UScriptStruct.hpp>
 #include <File/Macros.hpp>
@@ -7,6 +9,8 @@
 #include <Helpers/String.hpp>
 #include <Helpers/Casting.hpp>
 #include <SigScanner/SinglePassSigScanner.hpp>
+
+#include "ExceptionHandling.hpp"
 
 namespace RC::DotNetLibrary
 {
@@ -129,12 +133,44 @@ namespace RC::DotNetLibrary
     {
         if (Shared::Events[ProgramStart]) ManagedCommand(Command(Shared::Events[ProgramStart]));
     }
+    
+    static auto script_hook([[maybe_unused]] Unreal::UObject* Context, Unreal::FFrame& Stack, [[maybe_unused]] void* RESULT_DECL) -> void
+    {
+        auto execute_hook = [&](std::unordered_map<StringType, Framework::CSharpCallbackData>& callback_container, bool precise_name_match) {
+            if (callback_container.empty())
+            {
+                return;
+            }
+            if (auto it = callback_container.find(precise_name_match ? Stack.Node()->GetFullName() : Stack.Node()->GetName()); it != callback_container.end())
+            {
+                const auto& callback_data = it->second;
+                for (const auto& [callback, index] : callback_data.registry_indexes)
+                {
+                    callback(Context, Stack.Locals(), Stack.OutParms(), RESULT_DECL);
+                }
+            }
+        };
+
+        TRY([&] {
+            execute_hook(Framework::m_script_hook_callbacks, true);
+        });
+    }
 
     auto Runtime::fire_unreal_init() -> void
     {
         if (Shared::Events[UnrealInit]) ManagedCommand(Command(Shared::Events[UnrealInit]));
 
         for (const auto callback : unreal_init_callbacks) callback();
+        if (Unreal::UObject::ProcessLocalScriptFunctionInternal.is_ready() && Unreal::Version::IsAtLeast(4, 22))
+        {
+            Output::send(STR("Enabling custom events\n"));
+            Unreal::Hook::RegisterProcessLocalScriptFunctionPostCallback(script_hook);
+        }
+        else if (Unreal::UObject::ProcessInternalInternal.is_ready() && Unreal::Version::IsBelow(4, 22))
+        {
+            Output::send(STR("Enabling custom events\n"));
+            Unreal::Hook::RegisterProcessInternalPostCallback(script_hook);
+        }
     }
 
     auto Runtime::fire_update() -> void
@@ -146,19 +182,37 @@ namespace RC::DotNetLibrary
 
     namespace Framework
     {
-        #define CLR_GET_PROPERTY_VALUE(PropertyType, Type, Object, Name, Value)                                                                                               \
-            PropertyType* prop = static_cast<PropertyType*>(Object->GetPropertyByNameInChain(to_wstring(Name).c_str()));                                                        \
+        #define CLR_GET_PROPERTY_VALUE(PropertyType, Type, Object, Name, Value)                                                                                 \
+            PropertyType* prop = static_cast<PropertyType*>(Object->GetPropertyByNameInChain(to_wstring(Name).c_str()));                                        \
             if (!prop) return false;                                                                                                                            \
                                                                                                                                                                 \
-            *Value = *prop->ContainerPtrToValuePtr<Type>(Object);                                                                                                 \
+            *Value = *prop->ContainerPtrToValuePtr<Type>(Object);                                                                                               \
             return true;
 
-        #define CLR_SET_PROPERTY_VALUE(PropertyType, Type, Object, Name, Value)                                                                                               \
-            PropertyType* prop = static_cast<PropertyType*>(Object->GetPropertyByNameInChain(to_wstring(Name).c_str()));                                                        \
+        #define CLR_SET_PROPERTY_VALUE(PropertyType, Type, Object, Name, Value)                                                                                 \
+            PropertyType* prop = static_cast<PropertyType*>(Object->GetPropertyByNameInChain(to_wstring(Name).c_str()));                                        \
             if (!prop) return false;                                                                                                                            \
                                                                                                                                                                 \
-            *prop->ContainerPtrToValuePtr<Type>(Object) = Value;                                                                                                   \
-            return true;
+            *prop->ContainerPtrToValuePtr<Type>(Object) = Value;                                                                                                \
+        return true;
+
+        void Hooking::CSharpUnrealScriptFunctionHookPre(UnrealScriptFunctionCallableContext context, void* custom_data)
+        {
+            auto& csharp_data = *static_cast<CSharpUnrealScriptFunctionData*>(custom_data);
+
+            if (csharp_data.callback_ref == nullptr) return;
+            
+            csharp_data.callback_ref(context.Context, context.TheStack.Locals(), context.TheStack.OutParms(), nullptr);
+        }
+
+        void Hooking::CSharpUnrealScriptFunctionHookPost(UnrealScriptFunctionCallableContext context, void* custom_data)
+        {
+            auto& csharp_data = *static_cast<CSharpUnrealScriptFunctionData*>(custom_data);
+
+            if (csharp_data.post_callback_ref == nullptr) return;
+
+            csharp_data.post_callback_ref(context.Context, context.TheStack.Locals(), context.TheStack.OutParms(), context.RESULT_DECL);
+        }
         
         intptr_t Hooking::SigScan(const char* Signature)
         {
@@ -188,14 +242,55 @@ namespace RC::DotNetLibrary
             return hook;
         }
 
-        CallbackId Hooking::HookUFunctionPre(UFunction* function, const UnrealScriptFunctionCallable& PreCallback, void* CustomData)
+        CallbackIds Hooking::HookUFunction(UFunction* function, UFunctionCallback pre_callback, UFunctionCallback post_callback)
         {
-            return function->RegisterPreHook(PreCallback, CustomData);
-        }
+            int32_t generic_pre_id{};
+            int32_t generic_post_id{};
 
-        CallbackId Hooking::HookUFunctionPost(UFunction* function, const UnrealScriptFunctionCallable& PostCallback, void* CustomData)
-        {
-            return function->RegisterPostHook(PostCallback, CustomData);
+            const auto func_ptr = function->GetFunc();
+
+            if (func_ptr && func_ptr != Unreal::UObject::ProcessInternalInternal.get_function_address() &&
+                function->HasAnyFunctionFlags(FUNC_Native))
+            {
+                const auto& custom_data = g_hooked_script_function_data.emplace_back(std::make_unique<CSharpUnrealScriptFunctionData>(
+                    CSharpUnrealScriptFunctionData{0, 0, function, pre_callback, post_callback}));
+                CallbackId pre_id;
+                CallbackId post_id;
+                if (pre_callback)
+                    pre_id = function->RegisterPreHook(&CSharpUnrealScriptFunctionHookPre, custom_data.get());
+                else
+                    pre_id = 0;
+                if (post_callback)
+                    post_id = function->RegisterPostHook(&CSharpUnrealScriptFunctionHookPost, custom_data.get());
+                else
+                    post_id = 0;
+                custom_data->pre_callback_id = pre_id;
+                custom_data->post_callback_id = post_id;
+                m_generic_hook_id_to_native_hook_id.emplace(++m_last_generic_hook_id, pre_id);
+                generic_pre_id = m_last_generic_hook_id;
+                m_generic_hook_id_to_native_hook_id.emplace(++m_last_generic_hook_id, post_id);
+                generic_post_id = m_last_generic_hook_id;
+                Output::send<LogLevel::Verbose>(STR("[RegisterHook] Registered native hook ({}, {}) for {}\n"),
+                                    generic_pre_id,
+                                    generic_post_id,
+                                    function->GetFullName());
+            }
+            else if (func_ptr && func_ptr == Unreal::UObject::ProcessInternalInternal.get_function_address() &&
+                !function->HasAnyFunctionFlags(FUNC_Native))
+            {
+                ++m_last_generic_hook_id;
+                auto [callback_data, _] = m_script_hook_callbacks.emplace(function->GetFullName(), CSharpCallbackData{nullptr, {}});
+                callback_data->second.registry_indexes.emplace_back(CSharpCallbackData::RegistryIndex{pre_callback, m_last_generic_hook_id});
+
+                generic_pre_id = m_last_generic_hook_id;
+                generic_post_id = m_last_generic_hook_id;
+                Output::send<LogLevel::Verbose>(STR("[RegisterHook] Registered script hook ({}, {}) for {}\n"),
+                                                generic_pre_id,
+                                                generic_post_id,
+                                                function->GetFullName());
+            }
+
+            return CallbackIds { generic_pre_id, generic_post_id };
         }
 
         void Hooking::Unhook(PLH::x64Detour* Hook)
@@ -203,9 +298,18 @@ namespace RC::DotNetLibrary
             if (Hook) Hook->unHook();
         }
 
-        bool Hooking::UnhookUFunction(UFunction* function, CallbackId CallbackId)
+        void Hooking::UnhookUFunction(UFunction* function, CallbackIds callback_ids)
         {
-            return function->UnregisterHook(CallbackId);
+            if (const auto callback_data_it = m_script_hook_callbacks.find(function->GetFullName());
+                callback_data_it != m_script_hook_callbacks.end())
+            {
+                m_script_hook_callbacks.erase(callback_data_it);
+            }
+            else
+            {
+                function->UnregisterHook(callback_ids.pre_id);
+                function->UnregisterHook(callback_ids.post_id);
+            }
         }
 
         void Debug::Log(LogLevel::LogLevel Level, const char* Message)
@@ -626,6 +730,35 @@ namespace RC::DotNetLibrary
         void UnEnum::RemoveFromNamesAt(UEnum* Enum, int Index, int Count, bool AllowShrinking)
         {
             Enum->RemoveFromNamesAt(Index, Count, AllowShrinking);
+        }
+
+        int Function::GetParmsSize(UFunction* Func)
+        {
+            return Func->GetParmsSize();
+        }
+
+        int Function::GetOffsetOfParam(UFunction* Func, const char* Name)
+        {
+            const auto prop = Func->FindProperty(FName(to_wstring(Name)));
+            if (!prop)
+                throw std::runtime_error{std::format("Property not found: '{}'", Name)};
+            return prop->GetOffset_Internal();
+        }
+
+        int Function::GetSizeOfParam(UFunction* Func, const char* Name)
+        {
+            const auto prop = Func->FindProperty(FName(to_wstring(Name)));
+            if (!prop)
+                throw std::runtime_error{std::format("Property not found: '{}'", Name)};
+            return prop->GetSize();
+        }
+
+        int Function::GetReturnValueOffset(UFunction* Func)
+        {
+            const auto returnProp = Func->GetReturnProperty();
+            if (!returnProp)
+                throw std::runtime_error{std::format("ReturnProperty is null for '{}'", to_string(Func->GetFullName()))};
+            return returnProp->GetOffset_Internal();
         }
     }
 }
