@@ -276,7 +276,7 @@ namespace RC::DotNetLibrary
             static void Log(LogLevel::LogLevel Level, const char* Message);
         };
         
-        using UFunctionCallback = void(*)(UObject* pThis, void* parms, void* out_parms, void* return_val);
+        using UFunctionCallback = void(*)(UObject* pThis, void** parms, void* return_val);
         
         struct CSharpUnrealScriptFunctionData
         {

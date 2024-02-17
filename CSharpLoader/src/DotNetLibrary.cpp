@@ -146,7 +146,50 @@ namespace RC::DotNetLibrary
                 const auto& callback_data = it->second;
                 for (const auto& [callback, index] : callback_data.registry_indexes)
                 {
-                    callback(Context, Stack.Locals(), Stack.OutParms(), RESULT_DECL);
+                    auto node = Stack.Node();
+                    auto return_value_offset = node->GetReturnValueOffset();
+                    auto has_return_value = return_value_offset != 0xFFFF;
+                    auto num_unreal_params = node->GetNumParms();
+                    if (has_return_value && num_unreal_params > 0)
+                    {
+                        --num_unreal_params;
+                    }
+                    
+                    std::vector<void*> params;
+
+                    if (has_return_value || num_unreal_params > 0)
+                    {
+                        for (Unreal::FProperty* param : node->ForEachProperty())
+                        {
+                            if (!param->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_Parm))
+                            {
+                                continue;
+                            }
+                            if (has_return_value && param->GetOffset_Internal() == return_value_offset)
+                            {
+                                continue;
+                            }
+
+                            void* data{};
+                            if (param->HasAnyPropertyFlags(Unreal::EPropertyFlags::CPF_OutParm))
+                            {
+                                auto OutParams = Stack.OutParms();
+                                while (OutParams && OutParams->Property != param)
+                                {
+                                    OutParams = OutParams->NextOutParm;
+                                }
+                                data = OutParams ? OutParams->PropAddr : nullptr;
+                            }
+                            else
+                            {
+                                data = param->ContainerPtrToValuePtr<void>(Stack.Locals());
+                            }
+
+                            params.push_back(data);
+                        }
+                    }
+                    
+                    callback(Context, params.data(), RESULT_DECL);
                 }
             }
         };
@@ -200,18 +243,130 @@ namespace RC::DotNetLibrary
         {
             auto& csharp_data = *static_cast<CSharpUnrealScriptFunctionData*>(custom_data);
 
-            if (csharp_data.callback_ref == nullptr) return;
+            if (csharp_data.callback_ref == 0) return;
+
+            // Attempt at dynamically fetching the params
+            uint16_t return_value_offset = context.TheStack.CurrentNativeFunction()->GetReturnValueOffset();
+
+            // 'ReturnValueOffset' is 0xFFFF if the UFunction return type is void
+            csharp_data.has_return_value = return_value_offset != 0xFFFF;
+
+            uint8_t num_unreal_params = context.TheStack.CurrentNativeFunction()->GetNumParms();
+            if (csharp_data.has_return_value)
+            {
+                // Subtract one from the number of params if there's a return value
+                // This is because Unreal treats the return value as a param, and it's included in the 'NumParms' member variable
+                --num_unreal_params;
+            }
+
+            std::vector<void*> params;
             
-            csharp_data.callback_ref(context.Context, context.TheStack.Locals(), context.TheStack.OutParms(), nullptr);
+            bool has_properties_to_process = csharp_data.has_return_value || num_unreal_params > 0;
+            if (has_properties_to_process && (context.TheStack.Locals() || context.TheStack.OutParms()))
+            {
+                // int32_t current_param_offset{};
+
+                for (Unreal::FProperty* func_prop : context.TheStack.CurrentNativeFunction()->ForEachProperty())
+                {
+                    // Skip this property if it's not a parameter
+                    if (!func_prop->HasAnyPropertyFlags(CPF_Parm))
+                    {
+                        continue;
+                    }
+
+                    // Skip if this property corresponds to the return value
+                    if (csharp_data.has_return_value && func_prop->GetOffset_Internal() == return_value_offset)
+                    {
+                        csharp_data.return_property = func_prop;
+                        continue;
+                    }
+                    
+                    // Non-typed pointer to the current parameter value
+                    void* data{};
+                    if (func_prop->HasAnyPropertyFlags(CPF_OutParm))
+                    {
+                        auto OutParams = context.TheStack.OutParms();
+                        while (OutParams && OutParams->Property != func_prop)
+                        {
+                            OutParams = OutParams->NextOutParm;
+                        }
+                        data = OutParams ? OutParams->PropAddr : nullptr;
+                    }
+                    else
+                    {
+                        data = func_prop->ContainerPtrToValuePtr<void>(context.TheStack.Locals());
+                    }
+
+                    params.push_back(data);
+                }
+            }
+
+            csharp_data.callback_ref(context.Context, params.data(), nullptr);
         }
 
         void Hooking::CSharpUnrealScriptFunctionHookPost(UnrealScriptFunctionCallableContext context, void* custom_data)
         {
             auto& csharp_data = *static_cast<CSharpUnrealScriptFunctionData*>(custom_data);
 
-            if (csharp_data.post_callback_ref == nullptr) return;
+            if (csharp_data.post_callback_ref == 0) return;
 
-            csharp_data.post_callback_ref(context.Context, context.TheStack.Locals(), context.TheStack.OutParms(), context.RESULT_DECL);
+            // Attempt at dynamically fetching the params
+            uint16_t return_value_offset = context.TheStack.CurrentNativeFunction()->GetReturnValueOffset();
+
+            // 'ReturnValueOffset' is 0xFFFF if the UFunction return type is void
+            csharp_data.has_return_value = return_value_offset != 0xFFFF;
+
+            uint8_t num_unreal_params = context.TheStack.CurrentNativeFunction()->GetNumParms();
+            if (csharp_data.has_return_value)
+            {
+                // Subtract one from the number of params if there's a return value
+                // This is because Unreal treats the return value as a param, and it's included in the 'NumParms' member variable
+                --num_unreal_params;
+            }
+
+            std::vector<void*> params;
+            
+            bool has_properties_to_process = csharp_data.has_return_value || num_unreal_params > 0;
+            if (has_properties_to_process && (context.TheStack.Locals() || context.TheStack.OutParms()))
+            {
+                // int32_t current_param_offset{};
+
+                for (Unreal::FProperty* func_prop : context.TheStack.CurrentNativeFunction()->ForEachProperty())
+                {
+                    // Skip this property if it's not a parameter
+                    if (!func_prop->HasAnyPropertyFlags(CPF_Parm))
+                    {
+                        continue;
+                    }
+
+                    // Skip if this property corresponds to the return value
+                    if (csharp_data.has_return_value && func_prop->GetOffset_Internal() == return_value_offset)
+                    {
+                        csharp_data.return_property = func_prop;
+                        continue;
+                    }
+                    
+                    // Non-typed pointer to the current parameter value
+                    void* data{};
+                    if (func_prop->HasAnyPropertyFlags(CPF_OutParm))
+                    {
+                        auto OutParams = context.TheStack.OutParms();
+                        while (OutParams && OutParams->Property != func_prop)
+                        {
+                            OutParams = OutParams->NextOutParm;
+                        }
+                        data = OutParams ? OutParams->PropAddr : nullptr;
+                    }
+                    else
+                    {
+                        data = func_prop->ContainerPtrToValuePtr<void>(context.TheStack.Locals());
+                    }
+
+                    params.push_back(data);
+                }
+            }
+
+            csharp_data.callback_ref(context.Context, params.data(), context.RESULT_DECL);
         }
         
         intptr_t Hooking::SigScan(const char* Signature)
@@ -237,7 +392,7 @@ namespace RC::DotNetLibrary
 
         PLH::x64Detour* Hooking::Hook(const uint64_t fnAddress, const uint64_t fnCallback, uint64_t* userTrampVar)
         {
-            auto hook = new PLH::x64Detour(fnAddress, fnCallback, userTrampVar);
+            const auto hook = new PLH::x64Detour(fnAddress, fnCallback, userTrampVar);
             hook->hook();
             return hook;
         }
