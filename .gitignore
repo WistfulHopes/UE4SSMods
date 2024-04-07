@@ -2,3 +2,12 @@ Output/
 GGSTCharaSlots/
 DBFZCharaSlots/
 GBVSRCharaSlots/
+Intermediates/
+
+vsxmake2022/
+
+.idea/
+
+.xmake/
+
+Binaries/
