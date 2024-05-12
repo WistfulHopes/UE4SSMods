@@ -1,11 +1,17 @@
-local projectName = "GGSTBPPlayer"
+local projectName = "GBVSRollback"
 
 target(projectName)
     set_kind("shared")
     set_languages("cxx20")
     set_exceptions("cxx")
 
+    add_includedirs("include", { public = true })
+    add_headerfiles("include/**.hpp")
+
     add_files("src/dllmain.cpp")
+    add_files("src/PatternFinder.cpp")
+    add_files("src/BattleState.cpp")
+    add_files("src/Particles.cpp")
 
     add_deps(
         "UE4SS"

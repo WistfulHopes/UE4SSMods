@@ -1,14 +1,14 @@
-local projectName = "GGSTBPPlayer"
+local projectName = "ExamplePluginMod"
 
 target(projectName)
     set_kind("shared")
     set_languages("cxx20")
     set_exceptions("cxx")
-
+    
     add_files("src/dllmain.cpp")
 
     add_deps(
-        "UE4SS"
+        "UE4SS", "Function", "ModuleManagerMod"
     )
     
     on_load(function (target)

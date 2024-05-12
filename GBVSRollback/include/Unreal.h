@@ -1,10 +1,21 @@
 #pragma once
 
 #include <Unreal/AActor.hpp>
+#include <Unreal/Core/Containers/Array.hpp>
 #include "StructUtil.h"
 #include "BattleState.h"
+#include "Particles.h"
 
 class AGameState : public RC::Unreal::AActor {};
+
+class AREDPSCManager : public RC::Unreal::AActor {
+public:
+	FIELD(0x2A0, RC::Unreal::TArray<UParticleSystemComponent*>, m_DbgParticleList);
+
+	void PostRollback(int RollbackFrames)
+	{
+	}
+};
 
 class AREDGameState_Battle : public AGameState
 {
@@ -15,7 +26,8 @@ public:
 	{
 		return instance;
 	}
-	
+
+	FIELD(0x638, AREDPSCManager*, PSCManager);
 	FIELD(0xB38, BATTLE_CObjectManager*, BattleObjectManager);
 	FIELD(0xB40, BATTLE_CScreenManager*, BattleScreenManager);
 	FIELD(0xB50, BattleState*, State);

@@ -3,7 +3,6 @@
 #include <polyhook2/Detour/x64Detour.hpp>
 #include <SigScanner/SinglePassSigScanner.hpp>
 #include <Unreal/UObjectGlobals.hpp>
-#include <Unreal/UObject.hpp>
 
 #include "AActor.hpp"
 #include "BPMacros.hpp"
@@ -149,7 +148,7 @@ namespace GGSTMods
         static inline AActor*(*SpawnPlayer_Orig)(AActor*, const FSpawnPlayerInfo*);
         static AActor* SpawnPlayer_Hook(AActor* pGameState, const FSpawnPlayerInfo* info)
         {
-            const auto AssetName = FName(std::format(STR("/Game/Chara/{}/Costume{:02}/CharaBP.CharaBP_C"), info->CharaID.GetCharArray(), info->CostumeID + 1), FNAME_Add);
+            const auto AssetName = FName(std::format(STR("/Game/Chara/{}/Costume{:02}/CharaBP.CharaBP_C"), *((TArray<TCHAR>*)&info->CharaID)->GetData(), info->CostumeID + 1), FNAME_Add);
             auto AssetData = FAssetData();
             AssetData.SetObjectPath(AssetName);
             const auto Asset = UAssetRegistryHelpers::GetAsset(AssetData);
@@ -222,7 +221,7 @@ namespace GGSTMods
             
             const auto REDPTCMaterialAppendDataClass = reinterpret_cast<UClass*>(UObjectGlobals::StaticFindObject(nullptr, nullptr,
                 STR("/Script/RED.REDPTCMaterialAppendData")));
-            auto Append = UObjectGlobals::StaticFindObject(REDPTCMaterialAppendDataClass, (UObject*)-1, STR("/Game/Common/CMN/Common/Effect/Particles/AppendMaterialData.AppendMaterialData"));
+            auto Append = UObjectGlobals::StaticFindObject(REDPTCMaterialAppendDataClass, reinterpret_cast<UObject*>(-1), STR("/Game/Common/CMN/Common/Effect/Particles/AppendMaterialData.AppendMaterialData"));
             AREDPawn_SetupPTCColorAndMaterial(Player, *Player->GetPropertyByNameInChain(STR("PTCColorAndMaterial"))->ContainerPtrToValuePtr<UObject*>(Player), Append);
             AREDPawn_SetBoundsScale(Player, 40000.0);
             AREDPawn_SetupLinkBone(Player);

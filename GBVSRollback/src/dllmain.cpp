@@ -16,7 +16,7 @@ bool bCanRollback = false;
 bool bRollbackTest = false;
 RollbackData Data = RollbackData();
 Particle_RollbackData rollbackData;
-std::unordered_map<class OBJ_CBase*, Obj_RollbackData> objRollbackData;
+std::unordered_map<OBJ_CBase*, Obj_RollbackData> objRollbackData;
 
 // Particles
 
@@ -85,6 +85,10 @@ void PreRollback()
     }
 }
 
+void PostRollback() {
+
+}
+
 // Battle
 
 void(*UpdateBattle_Orig)(AREDGameState_Battle*, float, bool);
@@ -108,10 +112,10 @@ void UpdateBattle_Hook(AREDGameState_Battle* pThis, float DeltaTime, bool bUpdat
 class GBVSRollback : public CppUserModBase
 {
 public:
-    PLH::x64Detour* UpdateBattle_Detour;
-    PLH::x64Detour* UEParticleGet_Detour;
-    PLH::x64Detour* CreateParticleArg_Detour;
-    PLH::x64Detour* LinkParticleEx_Detour;
+    PLH::x64Detour* UpdateBattle_Detour {};
+    PLH::x64Detour* UEParticleGet_Detour {};
+    PLH::x64Detour* CreateParticleArg_Detour {};
+    PLH::x64Detour* LinkParticleEx_Detour {};
 
     GBVSRollback()
     {

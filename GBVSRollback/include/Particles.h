@@ -3,6 +3,7 @@
 #include <map>
 #include <Unreal/UActorComponent.hpp>
 #include "CXXBYTE.h"
+#include "StructUtil.h"
 
 template <class T>
 inline void hash_combine(std::size_t & s, const T & v)
@@ -52,7 +53,11 @@ struct Obj_RollbackData
 	CXXBYTE<32> LinkParticleActName;
 };
 
-class UParticleSystemComponent : public RC::Unreal::USceneComponent {};
+class UParticleSystemComponent : public RC::Unreal::USceneComponent 
+{
+public:
+	FIELD(0x7B8, class OBJ_CBase*, LinkObjPtr);
+};
 
 struct Particle_RollbackData
 {

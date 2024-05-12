@@ -1,15 +1,24 @@
-local projectName = "GGSTBPPlayer"
+local projectName = "ModuleManagerMod"
+
+add_requires("raw_pdb", { debug = is_mode_debug(), configs = { runtimes = get_mode_runtimes() } })
 
 target(projectName)
     set_kind("shared")
     set_languages("cxx20")
     set_exceptions("cxx")
 
-    add_files("src/dllmain.cpp")
+    add_includedirs("include", { public = true })
+    add_headerfiles("include/**.hpp")
+
+    add_files("src/ModuleManager.cpp")
+    add_files("src/SymbolResolver.cpp")
 
     add_deps(
         "UE4SS"
     )
+
+    add_packages("raw_pdb")
+
     
     on_load(function (target)
         import("build_configs", { rootdir = get_config("scriptsRoot") })
