@@ -287,7 +287,7 @@ public:
 
 void UCanvas::K2_DrawLine(FVector2D_Custom ScreenPositionA, FVector2D_Custom ScreenPositionB, float Thickness, FLinearColor_Custom RenderColor)
 {
-	static auto drawline_name = Unreal::FName(STR("K2_DrawLine"), Unreal::FNAME_Add);
+	static auto drawline_name = Unreal::FName(STR("K2_DrawLine"), FNAME_Add);
 	static auto fn = GetFunctionByNameInChain(drawline_name);
 	struct
 	{
@@ -305,7 +305,7 @@ void UCanvas::K2_DrawLine(FVector2D_Custom ScreenPositionA, FVector2D_Custom Scr
 
 FVector_Custom UCanvas::K2_Project(const FVector_Custom WorldPosition)
 {
-	static auto project_name = Unreal::FName(STR("K2_Project"), Unreal::FNAME_Add);
+	static auto project_name = Unreal::FName(STR("K2_Project"), FNAME_Add);
 	static auto fn = GetFunctionByNameInChain(project_name);
 	struct
 	{
@@ -321,7 +321,7 @@ FVector_Custom UCanvas::K2_Project(const FVector_Custom WorldPosition)
 
 void UCanvas::K2_DrawTriangle(UTexture* RenderTexture, Unreal::TArray<FCanvasUVTri>* Triangles)
 {
-	static auto drawtriangle_name = Unreal::FName(STR("K2_DrawTriangle"), Unreal::FNAME_Add);
+	static auto drawtriangle_name = Unreal::FName(STR("K2_DrawTriangle"), FNAME_Add);
 	static auto fn = GetFunctionByNameInChain(drawtriangle_name);
 	struct
 	{
@@ -574,6 +574,9 @@ void hook_AHUDPostRender(AHUD_Custom* hud) {
 	static bool show_only_me = false;
 	if (GetAsyncKeyState(VK_BACK) & 0x01) show_only_me = !show_only_me;
 
+	if (!battle_main->Work) return;
+	if (!battle_main->Player) return;
+	
 	for (auto& work : battle_main->Work->Global_work)
 	{
 		if (work.status & 2) continue;
@@ -591,6 +594,12 @@ void hook_AHUDPostRender(AHUD_Custom* hud) {
 		// draw_pushbox(canvas, &player);
 		draw_hitboxes(canvas, character_asset, &player);
 	}
+}
+
+
+void InitGameState(AGameModeBase* GameMode)
+{
+	ABattleMain::Reset();
 }
 
 /* Mod Definition */
@@ -613,6 +622,8 @@ public:
 	}
 
 	auto on_unreal_init() -> void override {
+		Hook::RegisterInitGameStatePreCallback(InitGameState);
+
 		auto hud = Unreal::UObjectGlobals::StaticFindObject(nullptr, nullptr, STR("/Script/Duck.Default__BattleHUD"));
 		if (!hud)
 		{
