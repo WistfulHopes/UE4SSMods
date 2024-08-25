@@ -2,7 +2,7 @@
 
 #include <Unreal/AActor.hpp>
 #include <Unreal/Core/Containers/Array.hpp>
-#include "StructUtil.h"
+#include "struct_util.h"
 #include "BattleState.h"
 #include "Particles.h"
 
@@ -10,11 +10,6 @@ class AGameState : public RC::Unreal::AActor {};
 
 class AREDPSCManager : public RC::Unreal::AActor {
 public:
-	FIELD(0x2A0, RC::Unreal::TArray<UParticleSystemComponent*>, m_DbgParticleList);
-
-	void PostRollback(int RollbackFrames)
-	{
-	}
 };
 
 class AREDGameState_Battle : public AGameState

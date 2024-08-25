@@ -3,7 +3,7 @@
 #include <Particles.h>
 #include <Unreal/Rotator.hpp>
 
-#include "StructUtil.h"
+#include "struct_util.h"
 #include "CXXBYTE.h"
 
 enum ACTV_STATE
@@ -147,152 +147,13 @@ class BattleState
     char pad[0x128];
 };
 
-class BattleEventBase
-{
-    char pad[0x20];
-
-public:
-    FIELD(0x0, uintptr_t, vftable);
-
-    virtual void Duplicate();
-};
-
-class ModeCheck : public BattleEventBase
-{
-public:
-    virtual void Duplicate() override;
-};
-
-class OnlyDramaBattle : public BattleEventBase
-{
-    char pad2[0x8];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class EntryEvent : public BattleEventBase
-{
-    char pad2[0x8];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class EntryChara : public BattleEventBase
-{
-    char pad2[0x8];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class RoundReset : public BattleEventBase
-{
-public:
-    virtual void Duplicate() override;
-};
-
-class DispRound : public BattleEventBase
-{
-    char pad2[0x8];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class CheckBattle : public BattleEventBase
-{
-    char pad2[0x20];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class CheckBattleOnAdvertise : public BattleEventBase
-{
-    char pad2[0x28];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class CheckBattleOnSparring : public BattleEventBase
-{
-    char pad2[0x30];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class CheckBattleOnTraining : public BattleEventBase
-{
-    char pad2[0x28];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class UnknownEvent11 : public BattleEventBase
-{
-    char pad2[0x28];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class QuickResetBattle : public BattleEventBase
-{
-public:
-    virtual void Duplicate() override;
-};
-
-class RoundEnd : public BattleEventBase
-{
-    char pad2[0x28];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class RoundEndWinAction : public BattleEventBase
-{
-    char pad2[0x18];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class MatchEndWinAction : public BattleEventBase
-{
-    char pad2[0x10];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class UnknownEvent16 : public BattleEventBase
-{
-    char pad2[0x8];
-
-public:
-    virtual void Duplicate() override;
-};
-
-class UnknownEvent17 : public BattleEventBase
-{
-    char pad2[0x8];
-
-public:
-    virtual void Duplicate() override;
-};
-
 class BattleEventManager
 {
     char pad[0xF0];
 
 public:
-    FIELD(0xB0, BattleEventBase*, m_pBattleEvent);
+    FIELD(0xB0, void*, m_pBattleEvent);
+    FIELD(0xDC, int, m_CurrentBEMState);
 };
 
 struct FMatrix
@@ -334,6 +195,7 @@ struct RollbackData {
     BATTLE_CScreenManager* ScrManager = nullptr;
     BattleState* State = nullptr;
     BattleEventManager* EvtManager = nullptr;
+    void* BtlEvent = nullptr;
     AA_CCamera::FRollbackData CamRollbackData;
     BattleBGLocation::FRollbackData BGRollbackData;
     

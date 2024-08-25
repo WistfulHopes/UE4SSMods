@@ -1,15 +1,13 @@
-#define NOMINMAX
-
-#include <polyhook2/Detour/x64Detour.hpp>
-#include <polyhook2/Exceptions/AVehHook.hpp>
+#include "safetyhook.hpp"
 #include <BattleState.h>
 #include <Particles.h>
-#include <PatternFinder.h>
 #include <Unreal.h>
 #include <UE4SSProgram.hpp>
 #include <UnrealDef.hpp>
 #include <Mod/CppUserModBase.hpp>
 #include <Unreal/AGameModeBase.hpp>
+
+#include "SigScanner/SinglePassSigScanner.hpp"
 
 AREDGameState_Battle* GameState;
 bool bCanRollback = false;
@@ -18,49 +16,99 @@ RollbackData Data = RollbackData();
 Particle_RollbackData rollbackData;
 std::unordered_map<OBJ_CBase*, Obj_RollbackData> objRollbackData;
 
+SafetyHookInline UpdateBattle_Detour{};
+SafetyHookInline UEParticleGet_Detour{};
+SafetyHookInline CreateParticleArg_Detour{};
+SafetyHookInline LinkParticleEx_Detour{};
+SafetyHookInline LinkParticleArg_Detour{};
+
 // Particles
 
 UParticleSystemComponent* pscToCache;
 
-void(*UEParticleGet_Orig)(void*, UParticleSystemComponent*, void*);
 void UEParticleGet_Hook(void* pThis, UParticleSystemComponent* UEParticle, void* arg)
 {
     pscToCache = UEParticle;
-    UEParticleGet_Orig(pThis, UEParticle, arg);
+    UEParticleGet_Detour.call(pThis, UEParticle, arg);
 }
 
-typedef void(*DeactivateSystem_Func)(UParticleSystemComponent*);
+typedef void (*SetComponentTickEnabled_Func)(Unreal::UActorComponent*, bool bEnabled);
+SetComponentTickEnabled_Func SetComponentTickEnabled;
+
+typedef void (*DeactivateSystem_Func)(UParticleSystemComponent*);
 DeactivateSystem_Func DeactivateSystem;
 
-typedef void(*KillParticlesForced_Func)(UParticleSystemComponent*);
+typedef void (*KillParticlesForced_Func)(UParticleSystemComponent*);
 KillParticlesForced_Func KillParticlesForced;
 
-void(*CreateParticleArg_Orig)(OBJ_CBase*, void*, CXXBYTE<32>*, int);
 void CreateParticleArg_Hook(OBJ_CBase* pThis, void* arg, CXXBYTE<32>* name, int pos)
 {
-    CreateParticleArg_Orig(pThis, arg, name, pos);
+    CreateParticleArg_Detour.call<void>(pThis, arg, name, pos);
     FPSCCacheKey UnlinkedPSCKey = MakeUnlinkedPSCKey(GameState, pThis, name);
-    rollbackData.unlinkedPscCache.insert({ UnlinkedPSCKey, pscToCache });
+    rollbackData.unlinkedPscCache.insert({UnlinkedPSCKey, pscToCache});
 }
 
-void(*LinkParticleEx_Orig)(OBJ_CBase*, void*, const CXXBYTE<32>*, int);
 void LinkParticleEx_Hook(OBJ_CBase* pThis, void* arg, const CXXBYTE<32>* name, int objType)
 {
-    if (Rollback_ProcessCachedPSC(pThis, name, 0x17, true))
+    pThis->m_CreateArg.m_CreateArg_SocketName.m_Buf[0] = 0;
+    pThis->m_CreateArg.m_CreateArg_Angle = 0;
+    pThis->m_CreateArg.m_CreateArg_AngleY = 0;
+    pThis->m_CreateArg.m_CreateArg_OffsetPosX = 0;
+    pThis->m_CreateArg.m_CreateArg_OffsetPosY = 0;
+    pThis->m_CreateArg.m_CreateArg_OffsetPosZ = 0;
+    pThis->m_CreateArg.m_CreateArg_ScaleX = 1000;
+    pThis->m_CreateArg.m_CreateArg_ScaleY = 1000;
+    pThis->m_CreateArg.m_CreateArg_ScaleZ = 1000;
+    pThis->m_CreateArg.m_CreateArg_Hikitsugi0 = 0;
+    pThis->m_CreateArg.m_CreateArg_HkrColor = -1;
+    pThis->m_CreateArg.m_CreateArg_MltColor = -1;
+    pThis->m_CreateArg.m_CreateArg_TransPriority = 0;
+    pThis->m_CreateArg.m_CreateArg_Direction = 0;
+    pThis->m_CreateArg.m_CreateArg_SocketUse = false;
+
+    if (Rollback_ProcessCachedPSC(pThis, name, objType, false)) return;
+    LinkParticleEx_Detour.call<void>(pThis, arg, name, objType);
+    Rollback_OnLinkParticle(pThis, name, objType, false);
+}
+
+void LinkParticleArg_Hook(OBJ_CBase* pThis, const CXXBYTE<32>* name, int objType)
+{
+    if (Rollback_ProcessCachedPSC(pThis, name, objType, true))
     {
         pThis->m_CreateArg.m_CreateArg_SocketName.m_Buf[0] = 0;
-        pThis->m_CreateArg.m_CreateArg_Angle = 0i64;
-        pThis->m_CreateArg.m_CreateArg_OffsetPosX = 0i64;
+        pThis->m_CreateArg.m_CreateArg_Angle = 0;
+        pThis->m_CreateArg.m_CreateArg_AngleY = 0;
+        pThis->m_CreateArg.m_CreateArg_OffsetPosX = 0;
+        pThis->m_CreateArg.m_CreateArg_OffsetPosY = 0;
         pThis->m_CreateArg.m_CreateArg_OffsetPosZ = 0;
         pThis->m_CreateArg.m_CreateArg_ScaleX = 1000;
         pThis->m_CreateArg.m_CreateArg_ScaleY = 1000;
-        pThis->m_CreateArg.m_CreateArg_ScaleZ = 1000i64;
+        pThis->m_CreateArg.m_CreateArg_ScaleZ = 1000;
+        pThis->m_CreateArg.m_CreateArg_Hikitsugi0 = 0;
+        pThis->m_CreateArg.m_CreateArg_HkrColor = -1;
         pThis->m_CreateArg.m_CreateArg_MltColor = -1;
-        pThis->m_CreateArg.m_CreateArg_TransPriority = 0i64;
+        pThis->m_CreateArg.m_CreateArg_TransPriority = 0;
+        pThis->m_CreateArg.m_CreateArg_Direction = 0;
+        pThis->m_CreateArg.m_CreateArg_SocketUse = false;
         return;
     }
-    LinkParticleEx_Orig(pThis, arg, name, objType);
-    Rollback_OnLinkParticle(pThis, name, 0x17, true);
+    LinkParticleArg_Detour.call<void>(pThis, name, objType);
+    Rollback_OnLinkParticle(pThis, name, objType, true);
+    pThis->m_CreateArg.m_CreateArg_SocketName.m_Buf[0] = 0;
+    pThis->m_CreateArg.m_CreateArg_Angle = 0;
+    pThis->m_CreateArg.m_CreateArg_AngleY = 0;
+    pThis->m_CreateArg.m_CreateArg_OffsetPosX = 0;
+    pThis->m_CreateArg.m_CreateArg_OffsetPosY = 0;
+    pThis->m_CreateArg.m_CreateArg_OffsetPosZ = 0;
+    pThis->m_CreateArg.m_CreateArg_ScaleX = 1000;
+    pThis->m_CreateArg.m_CreateArg_ScaleY = 1000;
+    pThis->m_CreateArg.m_CreateArg_ScaleZ = 1000;
+    pThis->m_CreateArg.m_CreateArg_Hikitsugi0 = 0;
+    pThis->m_CreateArg.m_CreateArg_HkrColor = -1;
+    pThis->m_CreateArg.m_CreateArg_MltColor = -1;
+    pThis->m_CreateArg.m_CreateArg_TransPriority = 0;
+    pThis->m_CreateArg.m_CreateArg_Direction = 0;
+    pThis->m_CreateArg.m_CreateArg_SocketUse = false;
 }
 
 void PreRollback()
@@ -69,6 +117,7 @@ void PreRollback()
     {
         if (i.second != nullptr && i.first.obj->m_ActiveState != 1)
         {
+            SetComponentTickEnabled(i.second, true);
             DeactivateSystem(i.second);
             KillParticlesForced(i.second);
         }
@@ -80,18 +129,27 @@ void PreRollback()
         if (!obj)
             break;
         AddLinkPSCToCache(obj);
-        reinterpret_cast<int*>(obj)[0xA7A8] = 0;
-        reinterpret_cast<int*>(obj)[0xA7AC] = 0;
+        obj->m_pLinkPSC = nullptr;
     }
 }
 
-void PostRollback() {
+void PostRollback()
+{
+    const auto Class = Unreal::UObjectGlobals::StaticFindObject<UClass*>(
+    nullptr, nullptr, to_wstring("/Script/Engine.ParticleSystemComponent"));
 
+    auto components = GameState->PSCManager->GetComponentsByClass(Class);
+
+    for (auto component : components)
+    {
+        auto psc = reinterpret_cast<UParticleSystemComponent*>(component);
+
+        if (psc->LinkObjPtr)
+            psc->LinkObjPtr->m_pLinkPSC = psc;
+    }
 }
 
 // Battle
-
-void(*UpdateBattle_Orig)(AREDGameState_Battle*, float, bool);
 
 void UpdateBattle_Hook(AREDGameState_Battle* pThis, float DeltaTime, bool bUpdateDraw)
 {
@@ -99,12 +157,13 @@ void UpdateBattle_Hook(AREDGameState_Battle* pThis, float DeltaTime, bool bUpdat
     {
         PreRollback();
         Data.LoadState(pThis);
-        UpdateBattle_Orig(pThis, DeltaTime, bUpdateDraw);
+        PostRollback();
+        UpdateBattle_Detour.call(pThis, DeltaTime, bUpdateDraw);
         Data.SaveState(pThis);
-        UpdateBattle_Orig(pThis, DeltaTime, bUpdateDraw);
+        UpdateBattle_Detour.call(pThis, DeltaTime, bUpdateDraw);
     }
     else
-        UpdateBattle_Orig(pThis, DeltaTime, bUpdateDraw);
+        UpdateBattle_Detour.call(pThis, DeltaTime, bUpdateDraw);
 }
 
 // Mod
@@ -112,11 +171,6 @@ void UpdateBattle_Hook(AREDGameState_Battle* pThis, float DeltaTime, bool bUpdat
 class GBVSRollback : public CppUserModBase
 {
 public:
-    PLH::x64Detour* UpdateBattle_Detour {};
-    PLH::x64Detour* UEParticleGet_Detour {};
-    PLH::x64Detour* CreateParticleArg_Detour {};
-    PLH::x64Detour* LinkParticleEx_Detour {};
-
     GBVSRollback()
     {
         ModName = STR("GBVSRollback");
@@ -130,11 +184,13 @@ public:
 
     ~GBVSRollback() override = default;
 
-    auto on_update() -> void override {}
+    auto on_update() -> void override
+    {
+    }
 
     auto on_unreal_init() -> void override
     {
-        Unreal::Hook::RegisterInitGameStatePreCallback([] (Unreal::AGameModeBase* Context)
+        Unreal::Hook::RegisterInitGameStatePreCallback([](Unreal::AGameModeBase* Context)
         {
             bRollbackTest = false;
             rollbackData = Particle_RollbackData();
@@ -145,46 +201,158 @@ public:
 
             if (Context->IsA(Class))
             {
-                AREDGameState_Battle::instance = static_cast<AREDGameState_Battle*>(UObjectGlobals::FindFirstOf(FName(STR("REDGameState_Battle"))));
+                AREDGameState_Battle::instance = static_cast<AREDGameState_Battle*>(UObjectGlobals::FindFirstOf(
+                    FName(STR("REDGameState_Battle"))));
                 GameState = AREDGameState_Battle::GetGameState();
                 bCanRollback = true;
             }
             else
                 bCanRollback = false;
         });
+
+        const SignatureContainer update_battle{
+            {
+                {
+                    "48 83 EC ? 48 89 5C 24 ? 48 89 6C 24 ? 4C 89 74 24"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                UpdateBattle_Detour = safetyhook::create_inline(self.get_match_address(), &UpdateBattle_Hook);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer ue_particle_get{
+            {
+                {
+                    "48 89 5C 24 ? 55 57 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 4C 89 B4 24"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                UEParticleGet_Detour = safetyhook::create_inline(self.get_match_address(), &UEParticleGet_Hook);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer create_particle_arg{
+            {
+                {
+                    "48 89 5C 24 ? 57 48 83 EC ? 48 8B FA 48 8B D9 48 85 D2 75 ? 33 C0"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                CreateParticleArg_Detour = safetyhook::create_inline(self.get_match_address(), &CreateParticleArg_Hook);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer set_component_tick_enabled{
+            {
+                {
+                    "48 89 5C 24 ? 57 48 83 EC ? F6 41 ? ? 0F B6 FA 48 8B D9 74 ? BA ? ? ? ? E8 ? ? ? ? 84 C0 75 ? 48 8D 4B ? 40 0F B6 D7 E8 ? ? ? ? 48 8B 5C 24 ? 48 83 C4 ? 5F C3 CC CC CC CC 48 89 5C 24"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                SetComponentTickEnabled = reinterpret_cast<SetComponentTickEnabled_Func>(self.get_match_address());
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer deactivate_system{
+            {
+                {
+                    "40 53 41 54 41 55 48 83 EC ? 4C 8B A9"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                DeactivateSystem = reinterpret_cast<DeactivateSystem_Func>(self.get_match_address());
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
         
-        HMODULE BaseModule = GetModuleHandleW(NULL);
+        const SignatureContainer kill_particles_forced{
+            {
+                {
+                    "48 89 5C 24 ? 56 48 83 EC ? 48 83 B9 ? ? ? ? ? 48 8B F1"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                KillParticlesForced = reinterpret_cast<KillParticlesForced_Func>(self.get_match_address());
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+        
+        const SignatureContainer link_particle_ex{
+            {
+                {
+                    "48 85 D2 0F 84 ? ? ? ? 55 41 56 41 57"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                LinkParticleEx_Detour = safetyhook::create_inline(self.get_match_address(), &LinkParticleEx_Hook);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
 
-        uintptr_t UpdateBattle_Addr = FindPattern(BaseModule, PBYTE("\x48\x83\xEC\x58\x48\x89\x5C\x24\x60\x48\x89\x6C\x24\x68\x4C\x89\x74\x24\x48"), "xxxxxxxxxxxxxxxxxxx");
-        UpdateBattle_Detour = new PLH::x64Detour(
-            UpdateBattle_Addr, reinterpret_cast<uint64_t>(&UpdateBattle_Hook),
-            reinterpret_cast<uint64_t*>(&UpdateBattle_Orig));
-        UpdateBattle_Detour->hook();
-
-        uintptr_t UEParticleGet_Addr = FindPattern(BaseModule, PBYTE("\x48\x89\x5C\x24\x18\x55\x57\x41\x57\x48\x8D\x6C\x24\xA0"), "xxxxxxxxxxxxxx");
-        UEParticleGet_Detour = new PLH::x64Detour(
-            UEParticleGet_Addr, reinterpret_cast<uint64_t>(&UEParticleGet_Hook),
-            reinterpret_cast<uint64_t*>(&UEParticleGet_Orig));
-        UEParticleGet_Detour->hook();
-
-        uintptr_t CreateParticleArg_Addr = FindPattern(BaseModule, PBYTE("\x48\x85\xD2\x0F\x84\x00\x00\x00\x00\x4C\x8B\xDC\x55\x56\x41\x55"), "xxxxx????xxxxxxx");
-        CreateParticleArg_Detour = new PLH::x64Detour(
-            CreateParticleArg_Addr, reinterpret_cast<uint64_t>(&CreateParticleArg_Hook),
-            reinterpret_cast<uint64_t*>(&CreateParticleArg_Orig));
-        CreateParticleArg_Detour->hook();
-
-        uintptr_t DeactivateSystem_Addr = FindPattern(BaseModule, PBYTE("\x40\x53\x41\x54\x41\x55\x48\x83\xEC\x50"), "xxxxxxxxxx");
-        DeactivateSystem = reinterpret_cast<DeactivateSystem_Func>(DeactivateSystem_Addr);
-
-        uintptr_t KillParticlesForced_Addr = FindPattern(BaseModule, PBYTE("\x48\x89\x5C\x24\x10\x56\x48\x83\xEC\x20\x48\x83\xB9\xA0\x07\x00\x00\x00"), "xxxxxxxxxxxxxxxxxx");
-        KillParticlesForced = reinterpret_cast<KillParticlesForced_Func>(KillParticlesForced_Addr);
-
-        uintptr_t LinkParticleEx_Addr = FindPattern(BaseModule, PBYTE("\x48\x85\xD2\x0F\x84\x00\x00\x00\x00\x55\x41\x56\x41\x57"), "xxxxx????xxxxx");
-        LinkParticleEx_Detour = new PLH::x64Detour(
-            LinkParticleEx_Addr, reinterpret_cast<uint64_t>(&LinkParticleEx_Hook),
-            reinterpret_cast<uint64_t*>(&LinkParticleEx_Orig));
-        LinkParticleEx_Detour->hook();
-
+        const SignatureContainer link_particle_arg{
+            {
+                {
+                    "48 89 5C 24 ? 55 56 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? F3 0F 10 0D ? ? ? ? 48 8B DA 33 D2 C7 45 ? ? ? ? ? 0F 28 C1 48 89 55 ? 0F 14 C1 8B C2 8B 45 ? 0F 57 C9 89 45 ? 41 8B F0"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                LinkParticleArg_Detour = safetyhook::create_inline(self.get_match_address(), &LinkParticleArg_Hook);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+        
+        std::vector<SignatureContainer> signature_containers;
+        signature_containers.push_back(update_battle);
+        signature_containers.push_back(ue_particle_get);
+        signature_containers.push_back(create_particle_arg);
+        signature_containers.push_back(set_component_tick_enabled);
+        signature_containers.push_back(deactivate_system);
+        signature_containers.push_back(kill_particles_forced);
+        signature_containers.push_back(link_particle_ex);
+        signature_containers.push_back(link_particle_arg);
+      
+        SinglePassScanner::SignatureContainerMap signature_containers_map;
+        signature_containers_map.emplace(ScanTarget::MainExe, signature_containers);
+            
+        SinglePassScanner::start_scan(signature_containers_map);
+        
         UE4SSProgram* Program = &UE4SSProgram::get_program();
         Program->register_keydown_event(Input::Key::F2, []
         {
@@ -201,21 +369,22 @@ public:
             {
                 PreRollback();
                 Data.LoadState(GameState);
+                PostRollback();
             }
         });
     }
 };
 
 #define GBVS_ROLLBACK_API __declspec(dllexport)
-extern "C"
-{
-    GBVS_ROLLBACK_API CppUserModBase* start_mod()
-    {
-        return new GBVSRollback();
-    }
 
-    GBVS_ROLLBACK_API void uninstall_mod(CppUserModBase* mod)
-    {
-        delete mod;
-    }
+extern "C" {
+GBVS_ROLLBACK_API CppUserModBase* start_mod()
+{
+    return new GBVSRollback();
+}
+
+GBVS_ROLLBACK_API void uninstall_mod(CppUserModBase* mod)
+{
+    delete mod;
+}
 }

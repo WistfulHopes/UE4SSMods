@@ -3,7 +3,7 @@
 #include <map>
 #include <Unreal/UActorComponent.hpp>
 #include "CXXBYTE.h"
-#include "StructUtil.h"
+#include "struct_util.h"
 
 template <class T>
 inline void hash_combine(std::size_t & s, const T & v)

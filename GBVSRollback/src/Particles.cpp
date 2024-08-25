@@ -48,12 +48,11 @@ bool Rollback_ProcessCachedPSC(OBJ_CBase* obj, const CXXBYTE<32>* name, int objT
 	UParticleSystemComponent* cachedPsc = GetCachedPSCForSet(obj);
 	if (cachedPsc == nullptr)
 	{
-		((int*)obj)[0xA7A8] = 0;
-		((int*)obj)[0xA7AC] = 0;
+		obj->m_pLinkPSC = nullptr;
 		return false;
 	}
-	reinterpret_cast<int**>(cachedPsc)[0x7B8] = reinterpret_cast<int*>(obj);
-	reinterpret_cast<int**>(obj)[0xA7A8] = reinterpret_cast<int*>(cachedPsc);
+	cachedPsc->LinkObjPtr = obj;
+	obj->m_pLinkPSC = cachedPsc;
 	const auto iter = objRollbackData.find(obj);
 	if (!iter->second.bLinkParticleSet)
 	{
