@@ -8,7 +8,10 @@ void RollbackData::SaveObj(BATTLE_CObjectManager* InObjManager)
 	{
         if (InObjManager->m_ObjVector[i].m_ActiveState > 0)
         {
-            std::memcpy(&ObjManager->m_ObjVector[i], &InObjManager->m_ObjVector[i], sizeof(OBJ_CBase));
+            std::memcpy(&ObjManager->m_ObjVector[i].ObjBaseSyncBegin, &InObjManager->m_ObjVector[i].ObjBaseSyncBegin, sizeof(OBJ_CBase) - 8);
+        	auto from = objData[&ObjManager->m_ObjVector[i]];
+        	auto to = StoredObjData[&ObjManager->m_ObjVector[i]];
+        	std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
         }
 	}
 }
@@ -17,7 +20,10 @@ void RollbackData::SaveChara(BATTLE_CObjectManager* InObjManager)
 {
 	for (int i = 0; i < 6; i++)
 	{
-        std::memcpy(&ObjManager->m_CharVector[i], &InObjManager->m_CharVector[i], sizeof(OBJ_CCharBase));
+        std::memcpy(&ObjManager->m_CharVector[i].ObjBaseSyncBegin, &InObjManager->m_CharVector[i].ObjBaseSyncBegin, sizeof(OBJ_CCharBase) - 8);
+		auto from = objData[&ObjManager->m_CharVector[i]];
+		auto to = StoredObjData[&ObjManager->m_CharVector[i]];
+		std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
 	}
 }
 
@@ -27,27 +33,30 @@ void RollbackData::SaveRPG(BATTLE_CObjectManager* InObjManager)
 	{
         if (InObjManager->m_ObjVector[i].m_ActiveState > 0)
         {
-            std::memcpy(&ObjManager->m_RpgVector[i], &InObjManager->m_RpgVector[i], sizeof(OBJ_CRPGBase));
+            std::memcpy(&ObjManager->m_RpgVector[i].ObjBaseSyncBegin, &InObjManager->m_RpgVector[i].ObjBaseSyncBegin, sizeof(OBJ_CRPGBase) - 8);
+        	auto from = objData[&ObjManager->m_RpgVector[i]];
+        	auto to = StoredObjData[&ObjManager->m_RpgVector[i]];
+        	std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
         }
 	}
 }
 
 void RollbackData::SaveState(AREDGameState_Battle* GameState) {
 	if (ObjManager == nullptr)
-		ObjManager = static_cast<BATTLE_CObjectManager*>(std::malloc(sizeof(BATTLE_CObjectManager)));
+		ObjManager = static_cast<BATTLE_CObjectManager*>(RC::Unreal::FMemory::Malloc(sizeof(BATTLE_CObjectManager)));
 	std::memcpy(ObjManager, GameState->BattleObjectManager, 0x83C0);
     std::memcpy(reinterpret_cast<char*>(ObjManager) + 0x12637E0, reinterpret_cast<char*>(GameState->BattleObjectManager) + 0x12637E0, 0x23BF0);
     SaveObj(GameState->BattleObjectManager);
     SaveChara(GameState->BattleObjectManager);
     SaveRPG(GameState->BattleObjectManager);
 	if (ScrManager == nullptr)
-		ScrManager = static_cast<BATTLE_CScreenManager*>(std::malloc(sizeof(BATTLE_CScreenManager)));
+		ScrManager = static_cast<BATTLE_CScreenManager*>(RC::Unreal::FMemory::Malloc(sizeof(BATTLE_CScreenManager)));
 	std::memcpy(ScrManager, GameState->BattleScreenManager, sizeof(BATTLE_CScreenManager));
 	if (State == nullptr)
-		State = static_cast<BattleState*>(std::malloc(sizeof(BattleState)));
+		State = static_cast<BattleState*>(RC::Unreal::FMemory::Malloc(sizeof(BattleState)));
 	std::memcpy(State, GameState->State, sizeof(BattleState));
 	if (EvtManager == nullptr)
-		EvtManager = static_cast<BattleEventManager*>(std::malloc(sizeof(BattleEventManager)));
+		EvtManager = static_cast<BattleEventManager*>(RC::Unreal::FMemory::Malloc(sizeof(BattleEventManager)));
 	std::memcpy(EvtManager, GameState->EventManager, sizeof(BattleEventManager));
 
 	if (BtlEvent)
@@ -236,7 +245,10 @@ void RollbackData::LoadObj(BATTLE_CObjectManager* InObjManager)
 	{
 		if (ObjManager->m_ObjVector[i].m_ActiveState > 0)
 		{
-			std::memcpy(&InObjManager->m_ObjVector[i], &ObjManager->m_ObjVector[i], sizeof(OBJ_CBase));
+			std::memcpy(&InObjManager->m_ObjVector[i].ObjBaseSyncBegin, &ObjManager->m_ObjVector[i].ObjBaseSyncBegin, sizeof(OBJ_CBase) - 8);
+			auto from = StoredObjData[&ObjManager->m_ObjVector[i]];
+			auto to = objData[&ObjManager->m_ObjVector[i]];
+			std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
 		}
 		else
 		{
@@ -249,7 +261,10 @@ void RollbackData::LoadChara(BATTLE_CObjectManager* InObjManager)
 {
 	for (int i = 0; i < 6; i++)
 	{
-        std::memcpy(&InObjManager->m_CharVector[i], &ObjManager->m_CharVector[i], sizeof(OBJ_CCharBase));
+        std::memcpy(&InObjManager->m_CharVector[i].ObjBaseSyncBegin, &ObjManager->m_CharVector[i].ObjBaseSyncBegin, sizeof(OBJ_CCharBase) - 8);
+		auto from = StoredObjData[&ObjManager->m_CharVector[i]];
+		auto to = objData[&ObjManager->m_CharVector[i]];
+		std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
 	}
 }
 
@@ -259,7 +274,10 @@ void RollbackData::LoadRPG(BATTLE_CObjectManager* InObjManager)
 	{
 		if (ObjManager->m_ObjVector[i].m_ActiveState > 0)
 		{
-            std::memcpy(&InObjManager->m_RpgVector[i], &ObjManager->m_RpgVector[i], sizeof(OBJ_CRPGBase));
+            std::memcpy(&InObjManager->m_RpgVector[i].ObjBaseSyncBegin, &ObjManager->m_RpgVector[i].ObjBaseSyncBegin, sizeof(OBJ_CRPGBase) - 8);
+			auto from = StoredObjData[&ObjManager->m_RpgVector[i]];
+			auto to = objData[&ObjManager->m_RpgVector[i]];
+			std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
 		}
 		else
 		{

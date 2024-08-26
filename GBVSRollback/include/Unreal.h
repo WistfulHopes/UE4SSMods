@@ -8,9 +8,7 @@
 
 class AGameState : public RC::Unreal::AActor {};
 
-class AREDPSCManager : public RC::Unreal::AActor {
-public:
-};
+class AREDPSCManager : public RC::Unreal::AActor {};
 
 class AREDGameState_Battle : public AGameState
 {

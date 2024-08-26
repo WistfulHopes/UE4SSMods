@@ -42,7 +42,9 @@ enum EMemberID : uint8_t
 class OBJ_CBase {
     char pad[0xA940];
 public:
-    FIELD(0x0, ACTV_STATE, m_ActiveState);
+    FIELD(0x8, int, ObjBaseSyncBegin);
+    FIELD(0x10, ACTV_STATE, m_ActiveState);
+    FIELD(0x14, bool, m_IsPlayerObj);
     FIELD(0x44, SIDE_ID, m_SideID);
     FIELD(0x48, EMemberID, m_MemberID);
     FIELD(0xA080, CXXBYTE<32>, m_CurActionName);
@@ -190,7 +192,29 @@ public:
 
 static_assert(sizeof(BattleBGLocation) == 0x230);
 
-struct RollbackData {    
+class OBJ_CBaseExt
+{
+public:
+    struct SRollbackData
+    {
+        CXXBYTE<32> LinkParticleName;
+        int LinkParticleObjType;
+        bool LinkParticleUseArg;
+        CCreateArg LinkParticleCreateArg;
+        bool bLinkParticleSet;
+        CXXBYTE<32> LinkParticleActName;
+        unsigned int PointLightId;
+    };
+
+    SRollbackData m_RollbackData;
+    float m_LinkParticleStartTime;
+    int m_LinkParticleActiveFrame;
+};
+
+extern std::unordered_map<OBJ_CBase*, OBJ_CBaseExt> objData;
+extern bool bIsRollback;
+
+struct RollbackData {
     BATTLE_CObjectManager* ObjManager = nullptr;
     BATTLE_CScreenManager* ScrManager = nullptr;
     BattleState* State = nullptr;
@@ -198,6 +222,7 @@ struct RollbackData {
     void* BtlEvent = nullptr;
     AA_CCamera::FRollbackData CamRollbackData;
     BattleBGLocation::FRollbackData BGRollbackData;
+    std::unordered_map<OBJ_CBase*, OBJ_CBaseExt> StoredObjData;
     
     void SaveObj(BATTLE_CObjectManager* InObjManager);
     void SaveChara(BATTLE_CObjectManager* InObjManager);
