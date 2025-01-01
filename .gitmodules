@@ -1,3 +1,18 @@
 [submodule "RE-UE4SS"]
 	path = RE-UE4SS
 	url = https://github.com/UE4SS-RE/RE-UE4SS.git
+[submodule "GGSTTwitch/cpr"]
+	path = GGSTTwitch/cpr
+	url = https://github.com/libcpr/cpr.git
+[submodule "GGSTTwitch/json"]
+	path = GGSTTwitch/json
+	url = https://github.com/nlohmann/json.git
+[submodule "GGSTSammi/json"]
+	path = GGSTSammi/json
+	url = https://github.com/nlohmann/json.git
+[submodule "GGSTSammi/cpr"]
+	path = GGSTSammi/cpr
+	url = https://github.com/libcpr/cpr.git
+[submodule "GGSTModManager/glaze"]
+	path = GGSTModManager/glaze
+	url = https://github.com/stephenberry/glaze.git
