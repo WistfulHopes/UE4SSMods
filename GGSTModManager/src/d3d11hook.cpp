@@ -23,18 +23,11 @@ static ID3D11Device* g_pd3dDevice = nullptr;
 static ID3D11DeviceContext* g_pd3dContext = nullptr;
 static IDXGISwapChain* g_pSwapChain = nullptr;
 static bool g_isInitialized;
-static bool g_recreateBuffers;
 
 SafetyHookInline shD3D11Present;
-SafetyHookInline shD3D11DrawIndexed;
-SafetyHookInline shD3D11CreateQuery;
-SafetyHookInline shD3D11PSSetShaderResources;
-SafetyHookInline shD3D11ClearRenderTargetViewHook;
 SafetyHookInline shD3D11ResizeBuffers;
 
 DWORD_PTR* pSwapChainVTable = nullptr;
-DWORD_PTR* pDeviceVTable = nullptr;
-DWORD_PTR* pDeviceContextVTable = nullptr;
 
 RC::GUI::ModManager::ModManager* pak_reloader;
 ID3D11RenderTargetView* g_mainRenderTargetView;
@@ -218,8 +211,9 @@ HRESULT __stdcall ResizeBuffersHook(
 )
 {
     CleanupRenderTarget();
-    g_recreateBuffers = true;
-    return shD3D11ResizeBuffers.call<HRESULT>(pSwapChain, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+    auto ret = shD3D11ResizeBuffers.call<HRESULT>(pSwapChain, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+    CreateRenderTarget();
+    return ret;
 }
 
 HRESULT __stdcall PresentHook(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags)
@@ -241,67 +235,10 @@ HRESULT __stdcall PresentHook(IDXGISwapChain* pSwapChain, UINT SyncInterval, UIN
         InitImGui();
         g_isInitialized = true;
     }
-    if (g_recreateBuffers)
-    {
-        CreateRenderTarget();
-        g_recreateBuffers = false;
-    }
 
     ImplHookDX11_Present(g_pd3dDevice, g_pd3dContext, g_pSwapChain);
 
     return shD3D11Present.call<HRESULT>(g_pSwapChain, SyncInterval, Flags);
-}
-
-void __stdcall DrawIndexedHook(ID3D11DeviceContext* pContext, UINT IndexCount, UINT StartIndexLocation,
-                               INT BaseVertexLocation)
-{
-    return shD3D11DrawIndexed.call(pContext, IndexCount, StartIndexLocation, BaseVertexLocation);
-}
-
-void __stdcall hookD3D11CreateQuery(ID3D11Device* pDevice, const D3D11_QUERY_DESC* pQueryDesc, ID3D11Query** ppQuery)
-{
-    if (pQueryDesc->Query == D3D11_QUERY_OCCLUSION)
-    {
-        D3D11_QUERY_DESC oqueryDesc = CD3D11_QUERY_DESC();
-        (&oqueryDesc)->MiscFlags = pQueryDesc->MiscFlags;
-        (&oqueryDesc)->Query = D3D11_QUERY_TIMESTAMP;
-
-        return shD3D11CreateQuery.call(pDevice, &oqueryDesc, ppQuery);
-    }
-
-    return shD3D11CreateQuery.call(pDevice, pQueryDesc, ppQuery);
-}
-
-UINT pssrStartSlot;
-D3D11_SHADER_RESOURCE_VIEW_DESC Descr;
-
-void __stdcall hookD3D11PSSetShaderResources(ID3D11DeviceContext* pContext, UINT StartSlot, UINT NumViews,
-                                             ID3D11ShaderResourceView* const * ppShaderResourceViews)
-{
-    pssrStartSlot = StartSlot;
-
-    for (UINT j = 0; j < NumViews; j++)
-    {
-        ID3D11ShaderResourceView* pShaderResView = ppShaderResourceViews[j];
-        if (pShaderResView)
-        {
-            pShaderResView->GetDesc(&Descr);
-
-            if ((Descr.ViewDimension == D3D11_SRV_DIMENSION_BUFFER) || (Descr.ViewDimension ==
-                D3D11_SRV_DIMENSION_BUFFEREX))
-            {
-                continue; //Skip buffer resources
-            }
-        }
-    }
-
-    return shD3D11PSSetShaderResources.call(pContext, StartSlot, NumViews, ppShaderResourceViews);
-}
-
-void __stdcall ClearRenderTargetViewHook(ID3D11DeviceContext* pContext, ID3D11RenderTargetView* pRenderTargetView,
-                                         const FLOAT ColorRGBA[4])
-{
-    return shD3D11ClearRenderTargetViewHook.call(pContext, pRenderTargetView, ColorRGBA);
 }
 
 DWORD __stdcall HookDX11_Init()
@@ -312,6 +249,8 @@ DWORD __stdcall HookDX11_Init()
     {
         ZeroMemory(&sd, sizeof(sd));
         sd.BufferCount = 1;
+        sd.BufferDesc.Width = 100;
+        sd.BufferDesc.Height = 100;
         sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
         sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
@@ -319,14 +258,14 @@ DWORD __stdcall HookDX11_Init()
         sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
         sd.OutputWindow = g_hWnd;
         sd.SampleDesc.Count = 1;
-        sd.Windowed = ((GetWindowLongPtr(g_hWnd, GWL_STYLE) & WS_POPUP) != 0) ? false : true;
+        sd.Windowed = (GetWindowLongPtr(g_hWnd, GWL_STYLE) & WS_POPUP) == 0;
         sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
         sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
         sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
         sd.BufferDesc.Width = 1;
         sd.BufferDesc.Height = 1;
-        sd.BufferDesc.RefreshRate.Numerator = 0;
+        sd.BufferDesc.RefreshRate.Numerator = 60;
         sd.BufferDesc.RefreshRate.Denominator = 1;
     }
 
@@ -339,23 +278,11 @@ DWORD __stdcall HookDX11_Init()
         return E_FAIL;
     }
 
-    pSwapChainVTable = (DWORD_PTR*)(g_pSwapChain);
-    pSwapChainVTable = (DWORD_PTR*)(pSwapChainVTable[0]);
-
-    pDeviceVTable = (DWORD_PTR*)(g_pd3dDevice);
-    pDeviceVTable = (DWORD_PTR*)pDeviceVTable[0];
-
-    pDeviceContextVTable = (DWORD_PTR*)(g_pd3dContext);
-    pDeviceContextVTable = (DWORD_PTR*)(pDeviceContextVTable[0]);
+    pSwapChainVTable = (DWORD_PTR*)g_pSwapChain;
+    pSwapChainVTable = (DWORD_PTR*)pSwapChainVTable[0];
 
     shD3D11Present = safetyhook::create_inline((void*)pSwapChainVTable[8], &PresentHook);
     shD3D11ResizeBuffers = safetyhook::create_inline((void*)pSwapChainVTable[13], &ResizeBuffersHook);
-    shD3D11DrawIndexed = safetyhook::create_inline((void*)pDeviceContextVTable[12], &DrawIndexedHook);
-    shD3D11CreateQuery = safetyhook::create_inline((void*)pDeviceVTable[24], &hookD3D11CreateQuery);
-    shD3D11PSSetShaderResources = safetyhook::create_inline((void*)pDeviceContextVTable[8],
-                                                            &hookD3D11PSSetShaderResources);
-    shD3D11ClearRenderTargetViewHook = safetyhook::create_inline((void*)pSwapChainVTable[50],
-                                                                 &ClearRenderTargetViewHook);
 
     return S_OK;
 }
@@ -387,8 +314,5 @@ void ImplHookDX11_Shutdown()
     }
 
     shD3D11Present = {};
-    shD3D11DrawIndexed = {};
-    shD3D11CreateQuery = {};
-    shD3D11PSSetShaderResources = {};
-    shD3D11ClearRenderTargetViewHook = {};
+    shD3D11ResizeBuffers = {};
 }
