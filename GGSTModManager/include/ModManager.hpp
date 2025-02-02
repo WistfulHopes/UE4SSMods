@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -34,10 +35,12 @@ namespace RC::GUI::ModManager
         auto save_config() -> void;
         auto load_mods() -> void;
         auto mods_folder_popup() -> void;
+        auto load_sig_path() -> void;
         
         ModsConfig m_config;
         bool m_is_open{true};
         bool m_mods_loaded{false};
         int m_active_item{-1};
+        std::filesystem::path m_sig{};
     };
 }

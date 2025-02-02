@@ -16,7 +16,7 @@
 #include <misc/cpp/imgui_stdlib.h>
 
 #include "FString.hpp"
-#include "Mod/Mod.hpp"
+#include "UE4SSProgram.hpp"
 
 namespace RC::GUI::ModManager
 {
@@ -28,11 +28,22 @@ namespace RC::GUI::ModManager
         FString PakFilename;
     };
 
+    struct V427_FPakFile
+    {
+        void* idk1;
+        void* idk2;
+        void* idk3;
+        FString PakFilename;
+    };
+
     struct FPakFile
     {
         FString PakFilename()
         {
-            return std::bit_cast<V425_FPakFile*>(this)->PakFilename;
+            if (Version::IsBelow(4, 27))
+                return std::bit_cast<V425_FPakFile*>(this)->PakFilename;
+            else
+                return std::bit_cast<V427_FPakFile*>(this)->PakFilename;
         }
     };
 
@@ -56,16 +67,31 @@ namespace RC::GUI::ModManager
         bool (*fn)(FPakPlatformFile*, FString&, uint32_t, void*);
     };
 
+    struct V427_DelegateMount
+    {
+        void* idk1;
+        void* idk2;
+        void* idk3;
+        FPakPlatformFile* pak;
+        bool (*fn)(FPakPlatformFile*, FString&, uint32_t);
+    };
+
     struct DelegateMount
     {
         FPakPlatformFile* Pak()
         {
-            return std::bit_cast<V425_DelegateMount*>(this)->pak;
+            if (Version::IsBelow(4, 27))
+                return std::bit_cast<V425_DelegateMount*>(this)->pak;
+            else
+                return std::bit_cast<V427_DelegateMount*>(this)->pak;
         }
 
         bool Call(FString& str, uint32_t order)
         {
-            return std::bit_cast<V425_DelegateMount*>(this)->fn(this->Pak(), str, order, nullptr);
+            if (Version::IsBelow(4, 27))
+                return std::bit_cast<V425_DelegateMount*>(this)->fn(this->Pak(), str, order, nullptr);
+            else
+                return std::bit_cast<V427_DelegateMount*>(this)->fn(this->Pak(), str, order);
         }
     };
 
@@ -76,16 +102,31 @@ namespace RC::GUI::ModManager
         bool (*fn)(FPakPlatformFile*, FString&);
     };
 
+    struct V427_DelegateUnmount
+    {
+        void* idk1;
+        void* idk2;
+        void* idk3;
+        FPakPlatformFile* pak;
+        bool (*fn)(FPakPlatformFile*, FString&);
+    };
+
     struct DelegateUnmount
     {
         FPakPlatformFile* Pak()
         {
-            return std::bit_cast<V425_DelegateUnmount*>(this)->pak;
+            if (Version::IsBelow(4, 27))
+                return std::bit_cast<V425_DelegateUnmount*>(this)->pak;
+            else
+                return std::bit_cast<V427_DelegateUnmount*>(this)->pak;
         }
 
         bool Call(FString& str)
         {
-            return std::bit_cast<V425_DelegateUnmount*>(this)->fn(this->Pak(), str);
+            if (Version::IsBelow(4, 27))
+                return std::bit_cast<V425_DelegateUnmount*>(this)->fn(this->Pak(), str);
+            else
+                return std::bit_cast<V427_DelegateUnmount*>(this)->fn(this->Pak(), str);
         }
     };
 
@@ -215,15 +256,32 @@ namespace RC::GUI::ModManager
         }
     }
 
+    auto ModManager::load_sig_path() -> void
+    {
+        auto path = std::filesystem::path(UE4SSProgram::get_program().get_game_executable_directory());
+        m_sig = path.parent_path().parent_path() / "Content" / "Paks" / "pakchunk0-WindowsNoEditor.sig";
+    }
+
     auto ModManager::init() -> void
     {
         load_config();
+        load_sig_path();
+        enum DtorPattern
+        {
+            V425,
+            V427,
+        };
         SignatureContainer fplatformfilepak_dtor = [&]() -> SignatureContainer
         {
             return {
                 {
                     {
                         .signature = "40 56 48 83 EC 30 48 89 5C 24 ?? 48 8D 05 ?? ?? ?? ?? 48 89 7C 24",
+                        .custom_data = V425,
+                    },
+                    {
+                        .signature = "40 53 56 57 48 83 ec 20 48 8d 05 ?? ?? ?? ?? 4c 89 74 24 50 48 89 01 48 8b f9 e8 ?? ?? ?? ?? 48 8b c8",
+                        .custom_data = V427,
                     },
                 },
                 [&](SignatureContainer& self)
@@ -232,6 +290,16 @@ namespace RC::GUI::ModManager
                         STR("[ModManager]: found match: {}\n"), (void*)self.get_match_address());
 
                     int num = 0;
+                    const auto signature_identifier = static_cast<const DtorPattern>(self.get_signatures()[self.get_index_into_signatures()].custom_data);
+                    switch (signature_identifier)
+                    {
+                    case DtorPattern::V425:
+                        num = 1;
+                        break;
+                    case DtorPattern::V427:
+                        num = 0;
+                        break;
+                    }
 
                     uint8_t* data = self.get_match_address();
                     void* last = nullptr;
@@ -255,10 +323,10 @@ namespace RC::GUI::ModManager
 
                                 switch (num)
                                 {
-                                case 1:
+                                case 2:
                                     MountPak = *(DelegateMount**)ptr;
                                     break;
-                                case 2:
+                                case 3:
                                     OnUnmountPak = *(DelegateUnmount**)ptr;
                                     self.get_did_succeed() = true;
                                     return true;
@@ -319,7 +387,7 @@ namespace RC::GUI::ModManager
             if (entry.enabled) enabled_mods.emplace_back(entry);
             else disabled_mods.emplace_back(entry);
         }
-        
+
         m_config.m_mods.clear();
         m_config.m_mods.insert(m_config.m_mods.end(), enabled_mods.begin(), enabled_mods.end());
         m_config.m_mods.insert(m_config.m_mods.end(), disabled_mods.begin(), disabled_mods.end());
@@ -332,6 +400,21 @@ namespace RC::GUI::ModManager
         {
             if (dir_entry.path().extension() == ".pak")
             {
+                if (auto sig_name = (dir_entry.path().parent_path() / dir_entry.path().stem()).string() + ".sig";
+                    !std::filesystem::exists(sig_name))
+                {
+                    try
+                    {
+                        copy(m_sig, sig_name);
+                    }
+                    catch (const std::filesystem::filesystem_error& e)
+                    {
+                        Output::send<LogLevel::Error>(
+                            std::format(
+                                STR("Failed to copy sig to {}: {}\n"), to_wstring(sig_name), to_wstring(e.what())));
+                    }
+                }
+
                 existing_mod_entries.push_back(dir_entry.path().string());
 
                 auto it = std::ranges::find_if(m_config.m_mods, [&](const ModEntry& mod)
@@ -363,9 +446,9 @@ namespace RC::GUI::ModManager
         {
             auto path = FString(to_wstring(m_mod.m_path).c_str());
             OnUnmountPak->Call(path);
-            
+
             if (!m_mod.enabled) continue;
-            
+
             MountPak->Call(path, MountPak->Pak()->PakFiles.Num() * 100);
         }
 
