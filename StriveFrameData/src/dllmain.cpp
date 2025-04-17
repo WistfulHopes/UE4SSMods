@@ -156,7 +156,6 @@ using funcMatchStart_t = void (*)(AREDGameState_Battle*);
 using funcGetGameMode_t = int (*)(UREDGameCommon*);
 using funcUpdateBattle_t = void (*)(AREDGameState_Battle*, float);
 using funcUpdateBattleInput_t = void (*)(asw_inputs*, RECFLG_ENUM);
-using funcGetKeyOnFlag_t = GAMEKEY_FLAG (*)(uintptr_t);
 using funcGameKeyToRecFlag_t = RECFLG_ENUM (*)(PAD_ID, GAMEKEY_FLAG, bool);
 using funcUpdateSystem_t = void (*)(uintptr_t);
 using funcUpdateReplay_t = void (*)(BattleReplayManager*);
@@ -224,13 +223,14 @@ funcACamUpdateCamera_t orig_ACamUpdateCamera;
 funcMatchStart_t orig_MatchStart;
 funcUpdateBattle_t orig_UpdateBattle;
 funcUpdateBattleInput_t orig_UpdateBattleInput;
-funcGetKeyOnFlag_t orig_GetKeyOnFlag;
 funcGameKeyToRecFlag_t orig_GameKeyToRecFlag;
 funcUpdateSystem_t orig_UpdateSystem;
 funcUpdateReplay_t orig_UpdateReplay;
 funcSaveBackup_t orig_SaveBackup;
 funcRollback_t orig_Rollback;
 funcGetReplayManager_t orig_GetReplayManager;
+
+bool resetReplayManager;
 
 // State Data
 UE4SSProgram* Program;
@@ -254,7 +254,7 @@ public:
         if (int current_mode = orig_GetGameMode(GameCommon); current_mode != last_mode)
         {
             //       RC::Output::send<LogLevel::Warning>(STR("Mode Change: {}\n"), current_mode);
-            replay_manager.reset();
+            resetReplayManager = true;
             last_mode = current_mode;
             in_allowed_mode = (std::find(allowed_modes.begin(), allowed_modes.end(), current_mode) != allowed_modes.
                 end());
@@ -470,13 +470,13 @@ class ReplayManager
     asw_inputs* analyzer{};
     ReplayHead replayHead[6]{};
     ReplayManager_Internal* manager{};
-    
+
 public:
     void setManager(ReplayManager_Internal* inManager)
     {
         manager = inManager;
     }
-    
+
     bool isAnalyzerSame(const asw_inputs* in_analyzer) const
     {
         return analyzer == in_analyzer;
@@ -492,6 +492,12 @@ public:
 
     void update()
     {
+        if (resetReplayManager)
+        {
+            reset();
+            resetReplayManager = false;
+        }
+
         if (asw_state::get()->RoundCount != roundCount)
         {
             roundCount = asw_state::get()->RoundCount;
@@ -501,21 +507,18 @@ public:
         if (keybindings.getButtonState(keybindings.TOGGLE_TAKEOVER_BUTTON))
         {
             keybindings.resetButton(keybindings.TOGGLE_TAKEOVER_BUTTON);
-            if (!isTakeover)
-            {
-                isTakeover = true;
-                takeoverFrame = asw_engine::get()->GameFrame;
-                auto rollback = asw_rollback::get();
-                rollback->CurrentBackupDataIndex = -1;
-                orig_SaveBackup(rollback);
-                for (int i = 0; i < 6; i++)
-                {
-                    replayHead[i] = manager->m_ReplayBuffer[i].m_ReadHead;
-                }
-            }
-            else
+            if (isTakeover)
             {
                 reset();
+            }
+            isTakeover = true;
+            takeoverFrame = asw_engine::get()->GameFrame;
+            auto rollback = asw_rollback::get();
+            rollback->CurrentBackupDataIndex = 18;
+            orig_SaveBackup(rollback);
+            for (int i = 0; i < 6; i++)
+            {
+                replayHead[i] = manager->m_ReplayBuffer[i].m_ReadHead;
             }
         }
 
@@ -529,7 +532,7 @@ public:
         if (keybindings.getButtonState(keybindings.TAKEOVER_P2_BUTTON))
         {
             keybindings.resetButton(keybindings.TAKEOVER_P2_BUTTON);
-            if (isTakeover) 
+            if (isTakeover)
                 analyzer = &asw_engine::get()->inputs[3];
         }
 
@@ -558,10 +561,16 @@ public:
     int takeoverFrame = 0;
 } replay_manager;
 
+class GAME_KeyControler
+{
+public:
+    FIELD(0x78, uint32_t, m_PureKey);
+};
+
 class AASystemRED
 {
 public:
-    ARRAY_FIELD(0x1F8, uintptr_t[4], m_BattleKey);
+    ARRAY_FIELD(0x1F8, GAME_KeyControler*[4], m_BattleKey);
 } * system_red;
 
 class UeTracker
@@ -687,8 +696,31 @@ void hook_UpdateBattle(AREDGameState_Battle* GameState, float DeltaTime)
 
     keybindings.checkBinds(false);
     pause_manager.checkPause();
-    
+
     if (game_state.checkModeReplay()) replay_manager.update();
+    else
+    {
+        if (keybindings.getButtonState(keybindings.TOGGLE_TAKEOVER_BUTTON))
+        {
+            keybindings.resetButton(keybindings.TOGGLE_TAKEOVER_BUTTON);
+            auto rollback = asw_rollback::get();
+            rollback->CurrentBackupDataIndex = 18;
+            orig_SaveBackup(rollback);
+        }
+        if (keybindings.getButtonState(keybindings.TOGGLE_REWIND_BUTTON))
+        {
+            keybindings.resetButton(keybindings.TOGGLE_REWIND_BUTTON);
+            auto rollback = asw_rollback::get();
+            rollback->CurrentBackupDataIndex = 0;
+            rollback->RollbackFrame = 1;
+            rollback->TotalRollbackFrames = 0;
+            auto backupData = rollback->BackupData[19];
+            orig_Rollback(rollback);
+            rollback->BackupData[19] = backupData;
+            rollback->RollbackFrame = 0;
+            rollback->TotalRollbackFrames = 0;
+        }
+    }
 
     if (ModMenu::instance().pauseType() == 0 && pause_manager.advancing()) return;
     if (ModMenu::instance().pauseType() == 1 && pause_manager.cinematicShouldAdvance()) return;
@@ -733,10 +765,18 @@ void hook_UpdateBattleInput(asw_inputs* Analyzer, RECFLG_ENUM recFlag)
         return;
     }
 
+    const auto module = GetModuleHandleA(NULL);
+
+    // Value is from KeyConfig2GKF, the final if/else set
+
+    auto bak = *((uint8_t*)module + 0x4F39B73);
+    *((uint8_t*)module + 0x4F39B73) = 1;
+
     auto pad = game_state.getMainQuadrant();
-    auto gameKeyFlag = orig_GetKeyOnFlag(system_red->m_BattleKey[pad]);
+    auto gameKeyFlag = static_cast<GAMEKEY_FLAG>(system_red->m_BattleKey[pad]->m_PureKey);
     auto newRecflag = orig_GameKeyToRecFlag(pad, gameKeyFlag, false);
 
+    *((uint8_t*)module + 0x4F39B73) = bak;
     orig_UpdateBattleInput(Analyzer, newRecflag);
 }
 
@@ -765,10 +805,9 @@ void hook_UpdateReplay(BattleReplayManager* Manager)
         rollback->CurrentBackupDataIndex = 0;
         rollback->RollbackFrame = 1;
         rollback->TotalRollbackFrames = 0;
-        auto backupData = rollback->BackupData[0];
-        rollback->BackupData[19] = rollback->BackupData[0];
+        auto backupData = rollback->BackupData[19];
         orig_Rollback(rollback);
-        rollback->BackupData[0] = backupData;
+        rollback->BackupData[19] = backupData;
         rollback->RollbackFrame = 0;
         rollback->TotalRollbackFrames = 0;
         replay_manager.restoreReplayHead();
@@ -850,9 +889,6 @@ public:
 
         const uintptr_t GetGameMode_Addr = sigscan::get().scan("\x0F\xB6\x81\xF0\x02\x00\x00\xC3", "xxxxxxxx");
         orig_GetGameMode = reinterpret_cast<funcGetGameMode_t>(GetGameMode_Addr);
-
-        const uintptr_t GetKeyOnFlag_Addr = sigscan::get().scan("\x48\x8B\x41\x60\x8B\x40\x18", "xxxxxxx");
-        orig_GetKeyOnFlag = reinterpret_cast<funcGetKeyOnFlag_t>(GetKeyOnFlag_Addr);
 
         const uintptr_t GameKeyToRecFlag_Addr = sigscan::get().scan(
             "\x89\x54\x24\x00\x89\x4C\x24\x00\x53\x55\x56\x57\x41\x54\x41\x55\x41\x56\x41\x57\x48\x83\xEC\x00\x8B\xFA",
