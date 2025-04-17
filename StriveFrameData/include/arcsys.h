@@ -20,9 +20,48 @@ public:
 
 class AREDGameState_Battle : public AGameState {
 public:
+  FIELD(0xC18, class asw_rollback*, Rollback);
   FIELD(0xC30, class asw_engine*, Engine);
   FIELD(0xC38, class asw_scene*, Scene);
+  FIELD(0xC48, class asw_state*, State);
   FIELD(0xC50, class asw_events*, Events);
+};
+
+class asw_rollback
+{
+public:
+  struct backup_data
+  {
+    FIELD(0x0, bool, bSet);
+
+    char pad[0x8740];
+  };
+  
+  static asw_rollback *get();
+  
+  FIELD(0x8, int, MaxBackupFrame);
+  FIELD(0x10, RC::Unreal::TArray<backup_data>, BackupData);
+  FIELD(0x20, int, CurrentBackupDataIndex);
+  FIELD(0x28, RC::Unreal::uint64, ObjVectorBufferSize);
+  FIELD(0x30, RC::Unreal::uint64, CharVectorBufferSize);
+  FIELD(0x38, int, TotalRollbackFrames);
+  FIELD(0x3C, int, TotalRollbackCount);
+  FIELD(0x40, bool, bDoingRollbackProcess);
+  FIELD(0x4A8, int, RollbackFrame);
+  FIELD(0x4AC, int, InputSameFrames);
+  FIELD(0x4B0, int, InputSkipFrames);
+  FIELD(0x4B4, int, InputPredictionSkipFrames);
+  FIELD(0x4B8, int, HalfFrames);
+  FIELD(0x4BC, int, RemainingFastForwardFrames);
+  FIELD(0x4C0, bool, SkippedHudDraw);
+  FIELD(0x4C1, bool, InputMismatch);
+  FIELD(0x4C2, bool, IsRollBackFinish);
+  FIELD(0x4C3, bool, IsFastUpdateFinish);
+  FIELD(0x4C4, bool, IsFastUpdateDoing);
+  FIELD(0x4C5, bool, IsAppearAnimEnd);
+  FIELD(0x4C6, bool, IsRestoreAndResim);
+  FIELD(0x4C7, bool, bSaveLimitReached);
+  FIELD(0x4C8, int, SavedFrameCountThisFrame);
 };
 
 class player_block {
@@ -116,6 +155,7 @@ public:
   ARRAY_FIELD(0xC70, class asw_entity* [107], entities);
   ARRAY_FIELD(0x1498, RC::Unreal::AActor* [7], pawns);
   ARRAY_FIELD(0x3858, asw_inputs[6], inputs);
+  FIELD(0x3858, int, GameFrame);
 };
 
 class asw_scene {
@@ -127,6 +167,13 @@ public:
   // position/angle can be null
   void camera_transform(SimpleFVector *delta, SimpleFVector *position, SimpleFVector *angle) const;
   void camera_transform(SimpleFVector *position, SimpleFVector *angle) const;
+};
+
+class asw_state {
+public:
+  static asw_state *get();
+
+  FIELD(0x118, int, RoundCount);
 };
 
 // lower left corner is where things are drawn
@@ -309,11 +356,11 @@ public:
   FIELD(0x4D0, int, gravity);
   FIELD(0x4FC, int, pushbox_front_offset);
   FIELD(0x750, atk_param, atk_param_hit);
-  FIELD(0x7E8, int, activation_range_x_max);
-  FIELD(0x7EC, int, activation_range_y_max);
-  FIELD(0x7F0, int, activation_range_x_min);
-  FIELD(0x7F4, int, activation_range_y_min);
-  FIELD(0x7F8, int, throw_range);
+  FIELD(0x790, int, activation_range_x_max);
+  FIELD(0x794, int, activation_range_y_max);
+  FIELD(0x798, int, activation_range_x_min);
+  FIELD(0x79C, int, activation_range_y_min);
+  FIELD(0x7A0, int, throw_range);
   FIELD(0xB60, atk_param_ex, atk_param_ex_normal); // Outdated?
   FIELD(0xC1C, atk_param_ex, atk_param_ex_counter); // Outdated?
   FIELD(0xCF0, atk_param, atk_param_defend); // Outdated?

@@ -63,6 +63,12 @@ AREDGameState_Battle* getGameState() {
   return GameState;
 }
 
+asw_rollback* asw_rollback::get()
+{
+  auto* GameState = getGameState();
+  return GameState ? GameState->Rollback : nullptr;
+}
+
 asw_engine* asw_engine::get() {
   auto* GameState = getGameState();
   return GameState ? GameState->Engine : nullptr;
@@ -85,6 +91,12 @@ void asw_scene::camera_transform(SimpleFVector* delta, SimpleFVector* position, 
 void asw_scene::camera_transform(SimpleFVector* position, SimpleFVector* angle) const {
   SimpleFVector delta;
   asw_scene_camera_transform(this, &delta, position, angle);
+}
+
+asw_state* asw_state::get()
+{
+  auto* GameState = getGameState();
+  return GameState ? GameState->State : nullptr;
 }
 
 bool asw_entity::is_active() const {
