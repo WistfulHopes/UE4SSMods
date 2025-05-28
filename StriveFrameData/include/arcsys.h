@@ -629,7 +629,7 @@ class asw_player : public asw_entity {
 public:
   FIELD(0x62F0, int, enable_flag); // original: 0x6080 -> fixed: 0x60E0 (+0x060)
   FIELD(0x62FC, int, attack_flag); // original: 0x5F90 -> fixed: 0x60EC (+0x060)
-  FIELD(0x6320, int, blockstun); // original: 0x60A0 + 0x060 = 0x6100
+  FIELD(0x6310, int, blockstun); // original: 0x60A0 + 0x060 = 0x6100
   FIELD(0x9AD8, int, hitstun); // original: 0x9868 + 0x060 = 0x98C8
 
   FIELD(0x9BA8, int, pushboxYUpperAir);
