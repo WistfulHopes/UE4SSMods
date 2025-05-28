@@ -230,8 +230,6 @@ funcSaveBackup_t orig_SaveBackup;
 funcRollback_t orig_Rollback;
 funcGetReplayManager_t orig_GetReplayManager;
 
-bool resetReplayManager;
-
 // State Data
 UE4SSProgram* Program;
 
@@ -254,7 +252,6 @@ public:
         if (int current_mode = orig_GetGameMode(GameCommon); current_mode != last_mode)
         {
             //       RC::Output::send<LogLevel::Warning>(STR("Mode Change: {}\n"), current_mode);
-            resetReplayManager = true;
             last_mode = current_mode;
             in_allowed_mode = (std::find(allowed_modes.begin(), allowed_modes.end(), current_mode) != allowed_modes.
                 end());
@@ -309,7 +306,7 @@ public:
 class Keybinds
 {
 public:
-    static const int BUTTON_COUNT = 13;
+    static const int BUTTON_COUNT = 14;
 
     int TOGGLE_FRAMEBAR_BUTTON = VK_F1;
     int TOGGLE_HITBOX_BUTTON = VK_F2;
@@ -317,9 +314,10 @@ public:
     int ADVANCE_BUTTON = VK_F4;
     int TOGGLE_MENU_BUTTON = VK_F5;
 
-    int TOGGLE_TAKEOVER_BUTTON = VK_F6;
+    int TOGGLE_SAVE_BUTTON = VK_F6;
     int TAKEOVER_P1_BUTTON = VK_F7;
     int TAKEOVER_P2_BUTTON = VK_F8;
+    int TOGGLE_LOAD_BUTTON = VK_F9;
     int TOGGLE_REWIND_BUTTON = VK_F9;
 
     int MENU_UP_BUTTON = VK_UP;
@@ -329,7 +327,7 @@ public:
 
     int buttons[BUTTON_COUNT] = {
         TOGGLE_FRAMEBAR_BUTTON, TOGGLE_HITBOX_BUTTON, PAUSE_BUTTON, ADVANCE_BUTTON, TOGGLE_MENU_BUTTON,
-        TOGGLE_TAKEOVER_BUTTON, TAKEOVER_P1_BUTTON, TAKEOVER_P2_BUTTON, TOGGLE_REWIND_BUTTON,
+        TOGGLE_SAVE_BUTTON, TAKEOVER_P1_BUTTON, TAKEOVER_P2_BUTTON, TOGGLE_LOAD_BUTTON, TOGGLE_REWIND_BUTTON,
         MENU_UP_BUTTON, MENU_DOWN_BUTTON, MENU_LEFT_BUTTON, MENU_RIGHT_BUTTON
     };
 
@@ -482,7 +480,7 @@ public:
         return analyzer == in_analyzer;
     }
 
-    void restoreReplayHead()
+    void restoreReplayHead() const
     {
         for (int i = 0; i < 6; i++)
         {
@@ -490,29 +488,36 @@ public:
         }
     }
 
+    void rewindReplayHead() const
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            auto& peer = manager->m_ReplayBuffer[i];
+            if (const auto count = --peer.m_ReadHead.m_Count; count < 0x8CA0)
+            {
+                if (const auto cursor = peer.m_ReadHead.m_Count; peer.m_pBuffer[cursor] >> 16 < cursor)
+                    peer.m_ReadHead.m_Count--;
+            }
+            peer.m_ReadHead.m_SolidPosition--;
+        }
+    }
+
     void update()
     {
-        if (resetReplayManager)
-        {
-            reset();
-            resetReplayManager = false;
-        }
-
         if (asw_state::get()->RoundCount != roundCount)
         {
             roundCount = asw_state::get()->RoundCount;
             asw_engine::get()->GameFrame = 0;
         }
 
-        if (keybindings.getButtonState(keybindings.TOGGLE_TAKEOVER_BUTTON))
+        if (keybindings.getButtonState(keybindings.TOGGLE_SAVE_BUTTON))
         {
-            keybindings.resetButton(keybindings.TOGGLE_TAKEOVER_BUTTON);
+            keybindings.resetButton(keybindings.TOGGLE_SAVE_BUTTON);
             if (isTakeover)
             {
                 reset();
             }
             isTakeover = true;
-            takeoverFrame = asw_engine::get()->GameFrame;
             auto rollback = asw_rollback::get();
             rollback->CurrentBackupDataIndex = 18;
             orig_SaveBackup(rollback);
@@ -525,40 +530,43 @@ public:
         if (keybindings.getButtonState(keybindings.TAKEOVER_P1_BUTTON))
         {
             keybindings.resetButton(keybindings.TAKEOVER_P1_BUTTON);
-            if (isTakeover)
-                analyzer = &asw_engine::get()->inputs[0];
+            analyzer = &asw_engine::get()->inputs[0];
         }
 
         if (keybindings.getButtonState(keybindings.TAKEOVER_P2_BUTTON))
         {
             keybindings.resetButton(keybindings.TAKEOVER_P2_BUTTON);
+            analyzer = &asw_engine::get()->inputs[3];
+        }
+
+        if (keybindings.getButtonState(keybindings.TOGGLE_LOAD_BUTTON))
+        {
+            keybindings.resetButton(keybindings.TOGGLE_LOAD_BUTTON);
             if (isTakeover)
-                analyzer = &asw_engine::get()->inputs[3];
+            {
+                loadState = true;
+            }
         }
 
         if (keybindings.getButtonState(keybindings.TOGGLE_REWIND_BUTTON))
         {
             keybindings.resetButton(keybindings.TOGGLE_REWIND_BUTTON);
-            if (isTakeover)
-            {
-                toggleRewind = true;
-                analyzer = nullptr;
-            }
+            toggleRewind = !toggleRewind;
         }
     }
 
     void reset()
     {
         isTakeover = false;
+        loadState = false;
         toggleRewind = false;
-        takeoverFrame = 0;
         analyzer = nullptr;
     }
 
     bool isTakeover = false;
+    bool loadState = false;
     bool toggleRewind = false;
     int roundCount = -1;
-    int takeoverFrame = 0;
 } replay_manager;
 
 class GAME_KeyControler
@@ -648,7 +656,8 @@ void hook_MatchStart(AREDGameState_Battle* GameState)
     game_state.roundActive = false;
     pause_manager.reset();
     tracker.reset();
-
+    replay_manager.reset();
+    
     orig_MatchStart(GameState);
 }
 
@@ -700,16 +709,16 @@ void hook_UpdateBattle(AREDGameState_Battle* GameState, float DeltaTime)
     if (game_state.checkModeReplay()) replay_manager.update();
     else
     {
-        if (keybindings.getButtonState(keybindings.TOGGLE_TAKEOVER_BUTTON))
+        if (keybindings.getButtonState(keybindings.TOGGLE_SAVE_BUTTON))
         {
-            keybindings.resetButton(keybindings.TOGGLE_TAKEOVER_BUTTON);
+            keybindings.resetButton(keybindings.TOGGLE_SAVE_BUTTON);
             auto rollback = asw_rollback::get();
             rollback->CurrentBackupDataIndex = 18;
             orig_SaveBackup(rollback);
         }
-        if (keybindings.getButtonState(keybindings.TOGGLE_REWIND_BUTTON))
+        if (keybindings.getButtonState(keybindings.TOGGLE_LOAD_BUTTON))
         {
-            keybindings.resetButton(keybindings.TOGGLE_REWIND_BUTTON);
+            keybindings.resetButton(keybindings.TOGGLE_LOAD_BUTTON);
             auto rollback = asw_rollback::get();
             rollback->CurrentBackupDataIndex = 0;
             rollback->RollbackFrame = 1;
@@ -767,7 +776,7 @@ void hook_UpdateBattleInput(asw_inputs* Analyzer, RECFLG_ENUM recFlag)
 
     const auto module = GetModuleHandleA(NULL);
 
-    // Value is from KeyConfig2GKF, the final if/else set
+    // Value is from KeyConfig2GKF, the final if/else set, first function call
 
     auto bak = *((uint8_t*)module + 0x4F39B73);
     *((uint8_t*)module + 0x4F39B73) = 1;
@@ -788,19 +797,11 @@ void hook_UpdateSystem(uintptr_t System)
 
 void hook_UpdateReplay(BattleReplayManager* Manager)
 {
-    if (!replay_manager.isAnalyzerSame(nullptr))
-    {
-        if (!replay_manager.toggleRewind) return;
-
-        replay_manager.toggleRewind = false;
-        return;
-    }
-
     orig_UpdateReplay(Manager);
 
-    if (replay_manager.toggleRewind)
+    if (replay_manager.loadState)
     {
-        replay_manager.toggleRewind = false;
+        replay_manager.loadState = false;
         auto rollback = asw_rollback::get();
         rollback->CurrentBackupDataIndex = 0;
         rollback->RollbackFrame = 1;

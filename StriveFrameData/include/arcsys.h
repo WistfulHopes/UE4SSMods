@@ -627,21 +627,21 @@ enum PLATTACK_FLAG {
 class asw_player : public asw_entity {
 
 public:
-  FIELD(0x62B0, int, enable_flag); // original: 0x6080 -> fixed: 0x60E0 (+0x060)
-  FIELD(0x62BC, int, attack_flag); // original: 0x5F90 -> fixed: 0x60EC (+0x060)
-  FIELD(0x62D0, int, blockstun); // original: 0x60A0 + 0x060 = 0x6100
-  FIELD(0x9A98, int, hitstun); // original: 0x9868 + 0x060 = 0x98C8
+  FIELD(0x62F0, int, enable_flag); // original: 0x6080 -> fixed: 0x60E0 (+0x060)
+  FIELD(0x62FC, int, attack_flag); // original: 0x5F90 -> fixed: 0x60EC (+0x060)
+  FIELD(0x6320, int, blockstun); // original: 0x60A0 + 0x060 = 0x6100
+  FIELD(0x9AD8, int, hitstun); // original: 0x9868 + 0x060 = 0x98C8
 
-  FIELD(0x9B68, int, pushboxYUpperAir);
-  FIELD(0x9B6C, int, pushboxYLowerAir);
+  FIELD(0x9BA8, int, pushboxYUpperAir);
+  FIELD(0x9BAC, int, pushboxYLowerAir);
 
-  FIELD(0xC49C, ID_CMNACT, cur_cmn_action_id); // original: 0xC26C + 0x060 = 0xC2CC
-  FIELD(0xD1CC, int, slowdown_timer); // original: 0xCF9C + 0x060 = 0xCFFC
-  FIELD(0x1089F, MoveDataCollection, move_datas);
+  FIELD(0xC4DC, ID_CMNACT, cur_cmn_action_id); // original: 0xC26C + 0x060 = 0xC2CC
+  FIELD(0xD20C, int, slowdown_timer); // original: 0xCF9C + 0x060 = 0xCFFC
+  FIELD(0x10890, MoveDataCollection, move_datas);
 
-  FIELD(0x102A8, int, afro); // m_IsAfro Header: 0xed28, Offset: 0x508
-  FIELD(0x102E0, int, afroW);
-  FIELD(0x102E4, int, afroH);
+  FIELD(0x102E8, int, afro); // m_IsAfro Header: 0xed28, Offset: 0x508
+  FIELD(0x10230, int, afroW);
+  FIELD(0x10234, int, afroH);
 
   int calc_advantage();
   bool is_in_hitstun() const;
