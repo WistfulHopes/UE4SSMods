@@ -221,6 +221,7 @@ public:
     FIELD(0x4, int, atk_level);
     FIELD(0x8, int, atk_level_clash);
     FIELD(0xC, int, damage);
+    FIELD(0x14, int, m_AtkFlag2);
     FIELD(0x18, int, m_AtkFlag3);
     FIELD(0x1C, int, m_AtkFlag4);
     FIELD(0x24, int*, hitstop_enemy_addition);
@@ -252,6 +253,10 @@ public:
 class CAtkParamEx
 {
     char pad[0xC0];
+
+public:
+    FIELD(0x14, int, m_AtkLandStunTime);
+    FIELD(0x18, int, m_AtkAirStunTime);
 };
 
 class CInterruptInfo
@@ -289,6 +294,7 @@ public:
     FIELD(0x1C4, int, m_ActionTime);
     FIELD(0x280, int, m_HitStopTime);
     FIELD(0x28C, int, m_HitStopTimeBySousai);
+    FIELD(0x2C0, OBJ_CCharBase*, m_TargetObj);
     FIELD(0x3AC, int, m_PosY);
     FIELD(0x4C8, int, m_SpeedX);
     FIELD(0x4CC, int, m_SpeedY);
@@ -297,35 +303,37 @@ public:
     FIELD(0xB60, CAtkParamEx, m_AtkParamNH);
     FIELD(0xC20, CAtkParamEx, m_AtkParamCH);
     FIELD(0xD00, CAtkParam, m_DmgParam);
+    FIELD(0x1110, CAtkParamEx, m_DmgParamEx);
     FIELD(0x11DC, int, m_bIsCounterHit);
     FIELD(0x11EC, int, m_MutekiDagekiTime);
     ARRAY_FIELD(0x13D8, CInterruptInfo[106], m_InterruptInfo);
     FIELD(0x38B4, CActionRequestInfo, m_ActionRequestInfoReg);
-    FIELD(0x6298, unsigned int, m_PlayerFlag2);
-    FIELD(0x62AC, unsigned int, m_CtrlDir);
-    FIELD(0x62B0, unsigned int, m_EnableFlag);
-    FIELD(0x62B4, unsigned int, m_Enable2Flag);
-    FIELD(0x62D0, unsigned int, m_GuardStopCount);
-    FIELD(0x9a98, int, m_StunCount);
-    FIELD(0x9AD0, int, ply_JumpSpeed);
-    FIELD(0x9B0C, int, ply_Kizetsu);
-    FIELD(0xc3b4, int, m_ComboCount);
-    FIELD(0xc434, bool, m_IsImperfectCombo);
-    FIELD(0xc436, bool, m_UkemiMiss);
-    FIELD(0xC448, int, m_KizetsuPoint);
-    FIELD(0xC44C, int, m_KizetsuMax);
-    FIELD(0xC450, int, m_KizetsuTime);
-    FIELD(0xC454, int, m_KizetsuTimeMax);
-    FIELD(0xC49C, ID_CMNACT, m_CurCmnActionID);
-    FIELD(0xC9C0, int, m_ExKizetsu);
-    FIELD(0xC9E0, int, m_DustHomingTime);
-    FIELD(0xC9E4, int, m_DustHomingSubTime);
-    FIELD(0xCA2C, int, m_GuardBalance);
-    FIELD(0xEFF0, CAtkParam, m_AtkParamForGGThrowStack);
-    FIELD(0xF400, CAtkParamEx, m_AtkParamCHForGGThrowStack);
-    FIELD(0xF4C0, CAtkParamEx, m_AtkParamNHForGGThrowStack);
-    FIELD(0x107B8, int, m_CPUUkemi);
-    char pad[0xC4A0];
+    FIELD(0x62D8, unsigned int, m_PlayerFlag2);
+    FIELD(0x62EC, unsigned int, m_CtrlDir);
+    FIELD(0x62F0, unsigned int, m_EnableFlag);
+    FIELD(0x62F4, unsigned int, m_Enable2Flag);
+    FIELD(0x6310, unsigned int, m_GuardStopCount);
+    FIELD(0x9AD8, int, m_StunCount);
+    FIELD(0x9B10, int, ply_JumpSpeed);
+    FIELD(0x9B4C, int, ply_Kizetsu);
+    FIELD(0xC3F4, int, m_ComboCount);
+    FIELD(0xC41C, int, m_ComboTimeWithOutAnten);
+    FIELD(0xC474, bool, m_IsImperfectCombo);
+    FIELD(0xC476, bool, m_UkemiMiss);
+    FIELD(0xC488, int, m_KizetsuPoint);
+    FIELD(0xC48C, int, m_KizetsuMax);
+    FIELD(0xC490, int, m_KizetsuTime);
+    FIELD(0xC494, int, m_KizetsuTimeMax);
+    FIELD(0xC4DC, ID_CMNACT, m_CurCmnActionID);
+    FIELD(0xCA00, int, m_ExKizetsu);
+    FIELD(0xCA20, int, m_DustHomingTime);
+    FIELD(0xCA24, int, m_DustHomingSubTime);
+    FIELD(0xCA6C, int, m_GuardBalance);
+    FIELD(0xF030, CAtkParam, m_AtkParamForGGThrowStack);
+    FIELD(0xF440, CAtkParamEx, m_AtkParamCHForGGThrowStack);
+    FIELD(0xF520, CAtkParamEx, m_AtkParamNHForGGThrowStack);
+    FIELD(0x107F8, int, m_CPUUkemi);
+    char pad[0xC4E0];
     uint8_t m_InpFlag[2][333];
 
     bool IsInHitstun();
@@ -586,6 +594,9 @@ private:
     static inline SafetyHookInline IsCounterHitByGuardCounter;
     static inline SafetyHookInline GetAirStunTime;
     static inline SafetyHookInline GetSpawnPlayerInfoList;
+    static inline SafetyHookInline SetDamageParam;
+    static inline SafetyHookInline CalcAtkHitStopTime;
+    static inline SafetyHookInline CalcAtkAirStunTime;
     static inline SafetyHookMid SetGuardBackSpeed_JG;
     static inline SafetyHookMid PlayerInitializeOnEasyReset;
     static inline SafetyHookMid HitCollision;
@@ -603,6 +614,8 @@ private:
     static inline Function<void(OBJ_CCharBase*)> AtkAllDefault;
     static inline Function<void(OBJ_CCharBase*, const char*)> FuncCall;
     static inline Function<CSkillInfo*(OBJ_CCharBase*)> GetCurSkill;
+    static inline Function<int(OBJ_CCharBase*)> GetPosX;
+    static inline Function<uint32_t(OBJ_CCharBase*)> DirSign;
 
 public:
     Coda()
@@ -666,6 +679,8 @@ public:
 
     static bool ukemi_check(OBJ_CCharBase* ctx)
     {
+        //bool is_button_pressed = IsTrgBtnX(ctx, 3, 0) || IsTrgBtnX(ctx, 3, 1) || IsTrgBtnX(ctx, 3, 2) ||
+        //    IsTrgBtnX(ctx, 3, 3);
         bool is_button_pressed = ctx->m_InpFlag[ctx->m_CtrlDir][1] || ctx->m_InpFlag[ctx->m_CtrlDir][10] || ctx->
             m_InpFlag[ctx->m_CtrlDir][19] || ctx->m_InpFlag[ctx->m_CtrlDir][28];
         bool can_ukemi = ctx->m_StunCount <= 0 && (ctx->m_Enable2Flag & 0x100000) != 0
@@ -673,13 +688,18 @@ public:
 
         int32 ukemi_direction = 0;
 
-        if (ctx->m_InpFlag[ctx->m_CtrlDir][0x79])
+        if (ctx->m_InpFlag[0][120])
         {
             ukemi_direction = 1;
         }
-        else if (ctx->m_InpFlag[ctx->m_CtrlDir][0x5F])
+        else if (ctx->m_InpFlag[0][94])
         {
             ukemi_direction = -1;
+        }
+
+        if (GetPosX(ctx) > GetPosX(ctx->m_TargetObj))
+        {
+            ukemi_direction *= -1;
         }
 
         if (ctx->m_PlayerFlag2 & 0x1000)
@@ -721,11 +741,11 @@ public:
                     ctx->m_SpeedX /= 2;
                     if (ctx->m_ObjFlag & 0x400000 || ctx->m_ObjFlag & 0x800000)
                     {
-                        ctx->m_SpeedX += 22750;
+                        ctx->m_SpeedX += DirSign(ctx) * 22750;
                     }
                     else
                     {
-                        ctx->m_SpeedX += 14000;
+                        ctx->m_SpeedX += DirSign(ctx) * 14000;
                     }
                     ctx->m_MutekiDagekiTime = 17;
                     ActionRequest(ctx, "CmnActUkemi");
@@ -735,7 +755,7 @@ public:
                     ctx->m_Gravity = 1925;
                     ctx->m_SpeedY = ctx->ply_JumpSpeed / 2;
                     ctx->m_SpeedX /= 2;
-                    ctx->m_SpeedX -= 10500;
+                    ctx->m_SpeedX -= DirSign(ctx) * 10500;
                     ctx->m_MutekiDagekiTime = 15;
                     ActionRequest(ctx, "CmnActUkemi");
                 }
@@ -887,6 +907,104 @@ public:
         if (level < 0) return AirStunTimeTable[0];
         if (level > 4) return AirStunTimeTable[4];
         return AirStunTimeTable[level];
+    }
+
+    static void set_damage_param(OBJ_CCharBase* ctx, OBJ_CCharBase* atObj)
+    {
+        SetDamageParam.call(ctx, atObj);
+
+        if (ctx->m_DmgParam.atk_type != 3)
+        {
+            if ((ctx->m_DmgParam.m_AtkFlag2 & 0x10) == 0)
+            {
+                if (ctx->m_ComboTimeWithOutAnten > 1080)
+                {
+                    ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 50 / 100;
+                    ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 10 / 100;
+                }
+                else if (ctx->m_ComboTimeWithOutAnten > 840)
+                {
+                    ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 60 / 100;
+                }
+                else if (ctx->m_ComboTimeWithOutAnten > 600)
+                {
+                    ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 70 / 100;
+                }
+                else if (ctx->m_ComboTimeWithOutAnten > 420)
+                {
+                    ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 80 / 100;
+                }
+                else if (ctx->m_ComboTimeWithOutAnten > 300)
+                {
+                    ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 90 / 100;
+                }
+                else if (ctx->m_ComboTimeWithOutAnten > 180)
+                {
+                    ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 95 / 100;
+                }
+
+                if (ctx->m_DmgParamEx.m_AtkLandStunTime < 1) ctx->m_DmgParamEx.m_AtkAirStunTime = 1;
+                if (ctx->m_DmgParamEx.m_AtkAirStunTime < 1) ctx->m_DmgParamEx.m_AtkAirStunTime = 1;
+            }
+        }
+    }
+
+    static int calc_atk_air_stun_time(CAtkParamEx* ctx, uint32_t flag, CAtkParam* pAtkParam, CAtkParamEx* pCounterHit,
+                                      int defVal)
+    {
+        auto result = ctx->m_AtkAirStunTime;
+        if (result == INT_MAX) result = defVal;
+        if ((flag & 1) == 0) return result;
+        if (pCounterHit->m_AtkAirStunTime == INT_MAX) result *= 2;
+        else result = pCounterHit->m_AtkAirStunTime;
+        return result;
+    }
+
+    static int calc_atk_hit_stop_time(CAtkParam* ctx, int level, uint32_t calcFlag)
+    {
+        const auto result = ctx->hitstop;
+
+        if (result == INT_MAX)
+        {
+            if (level == -1) level = ctx->atk_level;
+            return get_hit_stop_time(level, calcFlag);
+        }
+
+        return result;
+    }
+
+    static int get_hit_stop_time(int level, bool isCH)
+    {
+        level = FMath::Clamp(level, 0, 5);
+        int result;
+        switch (level)
+        {
+        case 0:
+        default:
+            result = 11;
+            break;
+        case 1:
+            result = 12;
+            break;
+        case 2:
+            result = 13;
+            if (isCH) result += 2;
+            break;
+        case 3:
+            result = 14;
+            if (isCH) result += 4;
+            break;
+        case 4:
+            result = 15;
+            if (isCH) result += 6;
+            break;
+        case 5:
+            result = 20;
+            if (isCH) result += 8;
+            break;
+        }
+
+        return result;
     }
 
     auto on_unreal_init() -> void override
@@ -1045,11 +1163,10 @@ public:
         };
 
         // Proximity Throw
-        /*const SignatureContainer hit_collision_sig{
+        const SignatureContainer hit_collision_sig{
             {
                 {
-                    .signature =
-                    "33 D2 48 8B CE E8 ? ? ? ? 8D 55"
+                    .signature = "33 D2 48 8B CE E8 ? ? ? ? 8D 55"
                 }
             },
             [&](const SignatureContainer& self)
@@ -1112,8 +1229,7 @@ public:
         const SignatureContainer on_frame_step_for_player_sig{
             {
                 {
-                    .signature =
-                    "45 33 ED 45 39 AE ? ? ? ? 0F 8D"
+                    .signature = "45 33 ED 45 39 AE ? ? ? ? 0F 8D"
                 }
             },
             [&](const SignatureContainer& self)
@@ -1173,7 +1289,7 @@ public:
             [](SignatureContainer& self)
             {
             },
-        };*/
+        };
 
         // Multiple Characters Mod
         const SignatureContainer multiple_characters_sig{
@@ -1210,6 +1326,57 @@ public:
                                                                          ctx.rip = PlayerInitializeOnEasyReset_HookAddr
                                                                              + 0xE0;
                                                                      });
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        // Hitstun Mod
+        const SignatureContainer set_damage_param_sig{
+            {
+                {
+                    .signature =
+                    "48 89 5C 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 8B 81"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                SetDamageParam = safetyhook::create_inline(self.get_match_address(), set_damage_param);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer calc_atk_air_stun_time_sig{
+            {
+                {
+                    .signature =
+                    "44 8B 41 ? 41 81 F8 ? ? ? ? 44 0F 44 44 24 ? F6 C2 ? 74 ? 41 8B 41 ? 3D ? ? ? ? 41 0F 44 C0 C3 41 8B C0 C3 CC CC CC CC CC CC CC CC 8B 81"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                CalcAtkAirStunTime = safetyhook::create_inline(self.get_match_address(), calc_atk_air_stun_time);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer calc_atk_hit_stop_time_sig{
+            {
+                {
+                    .signature = "8B C2 8B 51 ? 81 FA ? ? ? ? 75 ? 83 F8"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                CalcAtkHitStopTime = safetyhook::create_inline(self.get_match_address(), calc_atk_hit_stop_time);
                 return true;
             },
             [](SignatureContainer& self)
@@ -1255,8 +1422,7 @@ public:
         const SignatureContainer is_training_dummy_sig{
             {
                 {
-                    .signature =
-                    "48 89 5C 24 ? 57 48 83 EC ? 48 8B F9 8B DA 48 8D 0D ? ? ? ? E8"
+                    .signature = "48 89 5C 24 ? 57 48 83 EC ? 48 8B F9 8B DA 48 8D 0D ? ? ? ? E8"
                 }
             },
             [&](const SignatureContainer& self)
@@ -1272,8 +1438,7 @@ public:
         const SignatureContainer is_action_requested_sig{
             {
                 {
-                    .signature =
-                    "48 83 EC ? 8B 81 ? ? ? ? 84 C0"
+                    .signature = "48 83 EC ? 8B 81 ? ? ? ? 84 C0"
                 }
             },
             [&](const SignatureContainer& self)
@@ -1289,8 +1454,7 @@ public:
         const SignatureContainer action_request_sig{
             {
                 {
-                    .signature =
-                    "48 89 5C 24 ? 57 48 83 EC ? 80 B9 ? ? ? ? ? 48 8B FA 48 8B D9 74 ? F7 81"
+                    .signature = "48 89 5C 24 ? 57 48 83 EC ? 80 B9 ? ? ? ? ? 48 8B FA 48 8B D9 74 ? F7 81"
                 }
             },
             [&](const SignatureContainer& self)
@@ -1306,8 +1470,7 @@ public:
         const SignatureContainer is_air_sig{
             {
                 {
-                    .signature =
-                    "48 83 EC ? F6 81 ? ? ? ? ? 75 ? E8 ? ? ? ? 85 C0 7F"
+                    .signature = "48 83 EC ? F6 81 ? ? ? ? ? 75 ? E8 ? ? ? ? 85 C0 7F"
                 }
             },
             [&](const SignatureContainer& self)
@@ -1357,13 +1520,45 @@ public:
         const SignatureContainer get_cur_skill_sig{
             {
                 {
-                    .signature =
-                    "48 63 81 ? ? ? ? 83 F8 ? 74 ? 48 69 D0"
+                    .signature = "48 63 81 ? ? ? ? 83 F8 ? 74 ? 48 69 D0"
                 }
             },
             [&](const SignatureContainer& self)
             {
                 GetCurSkill.assign_address(self.get_match_address());
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer get_pos_x_sig{
+            {
+                {
+                    .signature =
+                    "48 8B 5C 24 ? 48 83 C4 ? 5F C3 48 8B 5C 24 ? 8B C7 48 83 C4 ? 5F C3 CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC E9"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                GetPosX.assign_address(self.get_match_address() - 0x1A9);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer dir_sign_sig{
+            {
+                {
+                    .signature = "48 83 EC ? 48 8B 81 ? ? ? ? 48 85 C0 74 ? 48 8B C8 E8 ? ? ? ? 8B C8"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                DirSign.assign_address(self.get_match_address());
                 return true;
             },
             [](SignatureContainer& self)
@@ -1379,9 +1574,11 @@ public:
         signature_containers.push_back(on_frame_step_sig);
         signature_containers.push_back(risc_counter_sig);
         signature_containers.push_back(get_air_stun_time_sig);
+        signature_containers.push_back(set_damage_param_sig);
+        signature_containers.push_back(calc_atk_air_stun_time_sig);
         signature_containers.push_back(set_guard_back_speed_jg_sig);
-        //signature_containers.push_back(hit_collision_sig);
-        //signature_containers.push_back(on_frame_step_for_player_sig);
+        // signature_containers.push_back(hit_collision_sig);
+        // signature_containers.push_back(on_frame_step_for_player_sig);
         signature_containers.push_back(is_trg_btn_x_sig);
         signature_containers.push_back(training_menu_sig);
         signature_containers.push_back(is_training_dummy_sig);
@@ -1391,6 +1588,8 @@ public:
         signature_containers.push_back(atk_all_default_sig);
         signature_containers.push_back(func_call_sig);
         signature_containers.push_back(get_cur_skill_sig);
+        signature_containers.push_back(get_pos_x_sig);
+        signature_containers.push_back(dir_sign_sig);
         // signature_containers.push_back(multiple_characters_sig);
         // signature_containers.push_back(multiple_characters_2_sig);
 

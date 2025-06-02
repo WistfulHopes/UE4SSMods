@@ -6,6 +6,12 @@
 
 namespace RC::GUI::ModManager
 {
+    enum class Error
+    {
+        Success,
+        InvalidPath,
+    };
+    
     struct ModEntry
     {
         bool enabled;
@@ -17,6 +23,7 @@ namespace RC::GUI::ModManager
     {
         std::vector<ModEntry> m_mods;
         std::string m_mods_folder{};
+        bool m_is_open{true};
     };
     
     class ModManager
@@ -35,10 +42,11 @@ namespace RC::GUI::ModManager
         auto save_config() -> void;
         auto load_mods() -> void;
         auto mods_folder_popup() -> void;
+        auto error_popup() -> void;
         auto load_sig_path() -> void;
         
         ModsConfig m_config;
-        bool m_is_open{true};
+        Error m_error;
         bool m_mods_loaded{false};
         int m_active_item{-1};
         std::filesystem::path m_sig{};

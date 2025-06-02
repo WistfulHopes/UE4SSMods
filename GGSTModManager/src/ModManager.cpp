@@ -18,6 +18,8 @@
 #include "FString.hpp"
 #include "UE4SSProgram.hpp"
 
+#include <ShObjIdl_core.h>
+
 namespace RC::GUI::ModManager
 {
     using namespace RC::Unreal;
@@ -130,16 +132,15 @@ namespace RC::GUI::ModManager
         }
     };
 
-    DelegateMount* MountPak = nullptr;
-    DelegateUnmount* OnUnmountPak = nullptr;
-
-    ModManager::ModManager()
+    namespace
     {
+        DelegateMount* MountPak = nullptr;
+        DelegateUnmount* OnUnmountPak = nullptr;
     }
 
-    ModManager::~ModManager()
-    {
-    }
+    ModManager::ModManager() = default;
+
+    ModManager::~ModManager() = default;
 
     auto ModManager::render() -> void
     {
@@ -157,13 +158,14 @@ namespace RC::GUI::ModManager
             start_pos_set = true;
         }
 
-        ImGui::GetIO().MouseDrawCursor = m_is_open;
+        ImGui::GetIO().MouseDrawCursor = m_config.m_is_open;
 
-        if (OnUnmountPak != nullptr && MountPak != nullptr && m_is_open)
+        if (OnUnmountPak != nullptr && MountPak != nullptr && m_config.m_is_open)
         {
             mods_folder_popup();
+            error_popup();
 
-            ImGui::Begin("Guilty Gear -Strive- Mod Manager", &m_is_open, window_flags);
+            ImGui::Begin("Guilty Gear -Strive- Mod Manager", &m_config.m_is_open, window_flags);
 
             ImGuiStyle& style = ImGui::GetStyle();
 
@@ -235,23 +237,82 @@ namespace RC::GUI::ModManager
             return;
         }
 
-        if (!ImGui::IsPopupOpen("Select Mods Folder"))
+        if (!ImGui::IsPopupOpen("Select Mods Folder") && !ImGui::IsPopupOpen("Error"))
             ImGui::OpenPopup("Select Mods Folder");
 
         if (ImGui::BeginPopupModal("Select Mods Folder", NULL, ImGuiWindowFlags_AlwaysAutoResize))
         {
             ImGui::Text("Select the folder you wish to use to load and save mods.");
 
-            ImVec2 button_size(ImGui::GetFontSize() * 7.0f, 0.0f);
-
             ImGui::InputText("##mods-folder", &m_config.m_mods_folder);
             ImGui::SameLine();
 
-            if (ImGui::Button("Confirm", button_size) && !m_config.m_mods_folder.empty())
+            if (ImGui::Button("Browse"))
             {
-                m_mods_loaded = false;
-                load_mods();
-                ImGui::CloseCurrentPopup();
+                IFileDialog* pfd;
+                if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd))))
+                {
+                    DWORD dwOptions;
+                    if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
+                    {
+                        pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
+                    }
+                    if (SUCCEEDED(pfd->Show(NULL)))
+                    {
+                        IShellItem* psi;
+                        if (SUCCEEDED(pfd->GetResult(&psi)))
+                        {
+                            LPWSTR szFolder{};
+                            psi->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &szFolder);
+                            m_config.m_mods_folder = to_string(szFolder);
+                            psi->Release();
+                        }
+                    }
+                    pfd->Release();
+                }
+            }
+
+            if (ImGui::Button("Confirm") && !m_config.m_mods_folder.empty())
+            {
+                if (std::filesystem::exists(m_config.m_mods_folder))
+                {
+                    m_mods_loaded = false;
+                    load_mods();
+                    ImGui::CloseCurrentPopup();
+                }
+                else
+                {
+                    m_error = Error::InvalidPath;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+        }
+    }
+
+    auto ModManager::error_popup() -> void
+    {
+        if (m_error == Error::Success) return;
+        
+        if (!ImGui::IsPopupOpen("Error"))
+            ImGui::OpenPopup("Error");
+
+        if (ImGui::BeginPopupModal("Error", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            switch (m_error)
+            {
+            case Error::InvalidPath:
+                ImGui::Text(
+                    "The path you entered is not valid. Please enter the full path to your mods folder.");
+                break;
+            default:
+                ImGui::Text(
+                    "An unknown error occurred.");
+                break;
+            }
+
+            if (ImGui::Button("Ok"))
+            {
+                m_error = Error::Success;
             }
         }
     }
@@ -280,7 +341,7 @@ namespace RC::GUI::ModManager
                         .custom_data = V425,
                     },
                     {
-                        .signature = "40 53 56 57 48 83 ec 20 48 8d 05 ?? ?? ?? ?? 4c 89 74 24 50 48 89 01 48 8b f9 e8 ?? ?? ?? ?? 48 8b c8",
+                        .signature = "48 89 5C 24 ? 56 57 41 56 48 83 EC ? 48 8D 05 ? ? ? ? 4C 89 7C 24",
                         .custom_data = V427,
                     },
                 },
@@ -290,7 +351,8 @@ namespace RC::GUI::ModManager
                         STR("[ModManager]: found match: {}\n"), (void*)self.get_match_address());
 
                     int num = 0;
-                    const auto signature_identifier = static_cast<const DtorPattern>(self.get_signatures()[self.get_index_into_signatures()].custom_data);
+                    const auto signature_identifier = static_cast<const DtorPattern>(self.get_signatures()[self.
+                        get_index_into_signatures()].custom_data);
                     switch (signature_identifier)
                     {
                     case DtorPattern::V425:
@@ -360,21 +422,26 @@ namespace RC::GUI::ModManager
 
     auto ModManager::toggle_open() -> void
     {
-        m_is_open = !m_is_open;
+        m_config.m_is_open = !m_config.m_is_open;
+        save_config();
     }
 
     auto ModManager::load_config() -> void
     {
-        auto json = glz::read_file_json(m_config, "./mod_manager.json", std::string{});
+        std::ignore = glz::read_file_json(m_config, "./mod_manager.json", std::string{});
     }
 
     auto ModManager::save_config() -> void
     {
-        auto json = glz::write_file_json(m_config, "./mod_manager.json", std::string{});
+        std::ignore = glz::write_file_json(m_config, "./mod_manager.json", std::string{});
     }
 
     auto ModManager::load_mods() -> void
     {
+        if (!std::filesystem::exists(m_config.m_mods_folder))
+        {
+            m_config.m_mods_folder = "";
+        }
         if (m_mods_loaded || m_config.m_mods_folder.empty()) return;
 
         save_config();

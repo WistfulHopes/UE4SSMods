@@ -16,3 +16,6 @@
 [submodule "GGSTModManager/glaze"]
 	path = GGSTModManager/glaze
 	url = https://github.com/stephenberry/glaze.git
+[submodule "GGSTModManager/minhook"]
+	path = GGSTModManager/minhook
+	url = https://github.com/TsudaKageyu/minhook.git
