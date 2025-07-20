@@ -206,6 +206,9 @@ UScriptStruct* Suzie::FindOrCreateScriptStruct(FDynamicClassGenerationContext& C
     NewStruct->Bind();
     UStruct_StaticLink(NewStruct, false);
 
+    NewStruct->GetPropertiesSize() = Struct->Size;
+    NewStruct->GetMinAlignment() = 8;
+    
     // The engine does not gracefully handle empty structs, so force the struct size to be at least one byte
     if (NewStruct->GetPropertiesSize() == 0)
     {

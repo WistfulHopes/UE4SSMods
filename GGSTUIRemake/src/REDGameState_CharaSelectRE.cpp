@@ -74,6 +74,7 @@ void FCharaSelectPlayerParam::InitializeStruct()
                 .Offset = offsetof(FCharaSelectPlayerParam, bSelectCPU),
             }
         },
+        .Size = sizeof(FCharaSelectPlayerParam),
     };
 }
 
@@ -96,13 +97,20 @@ void AREDGameState_CharaSelectRE::InitializeClass()
     Class.SuperStruct = FString(STR("/Script/RED.REDGameState"));
     Class.Properties = {
         FDynamicProperty{
-            .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_ZeroConstructor | CPF_IsPlainOldData | CPF_NoDestructor |
-            CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
+            .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
             .Name = FString(STR("PlayerParam")),
             .Type = FString(STR("StructProperty")),
             .ArrayDim = 2,
             .Offset = offsetof(AREDGameState_CharaSelectRE, PlayerParam),
             .Struct = FString(STR("/Script/REDExtend.CharaSelectPlayerParam")),
+        },
+        FDynamicProperty{
+            .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_ZeroConstructor | CPF_IsPlainOldData | CPF_NoDestructor |
+            CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
+            .Name = FString(STR("bInitialized")),
+            .Type = FString(STR("BoolProperty")),
+            .ArrayDim = 1,
+            .Offset = offsetof(AREDGameState_CharaSelectRE, bInitialized),
         },
     };
 }

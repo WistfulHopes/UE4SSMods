@@ -76,6 +76,7 @@ class AREDGameState_CharaSelectRE : public AREDGameState
     
 public:
     FCharaSelectPlayerParam PlayerParam[2];
+    bool bInitialized;
     
     static void AREDGameState_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer);
     static void InitializeClass();
