@@ -81,6 +81,17 @@ FDynamicClass AREDGameState_CharaSelectRE::Class = {
     .Ctor = &AREDGameState_CharaSelectRE::AREDGameState_CharaSelectRE_Ctor,
 };
 
+void AREDGameState_CharaSelectRE::execInitialize(UObject* Context, [[maybe_unused]] FFrame* Stack, [[maybe_unused]] void* Z_Param__Result)
+{
+    static_cast<AREDGameState_CharaSelectRE*>(Context)->Initialize();
+}
+
+void AREDGameState_CharaSelectRE::Initialize()
+{
+    if (bInitialized) return;
+    bInitialized = true;
+}
+
 void AREDGameState_CharaSelectRE::AREDGameState_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer)
 {
     auto Super = StaticClass()->GetSuperClass();
@@ -110,6 +121,13 @@ void AREDGameState_CharaSelectRE::InitializeClass()
             .Type = FString(STR("BoolProperty")),
             .ArrayDim = 1,
             .Offset = offsetof(AREDGameState_CharaSelectRE, bInitialized),
+        },
+    };
+    Class.Functions = {
+        FDynamicFunction {
+            .Path = FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:Initialize")),
+            .Func = &AREDGameState_CharaSelectRE::execInitialize,
+            .Flags = FUNC_Public | FUNC_BlueprintCallable
         },
     };
 }

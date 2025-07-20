@@ -18,7 +18,7 @@ struct FDynamicProperty
     FString Struct;
     FString Enum;
     FDynamicProperty* Container;
-    FString SignatureFunction;
+    struct FDynamicFunction* SignatureFunction;
     FDynamicProperty* Inner;
     FDynamicProperty* Key;
     FDynamicProperty* Value;
@@ -27,7 +27,7 @@ struct FDynamicProperty
 struct FDynamicFunction
 {
     FString Path;
-    std::function<void(UObject*, FFrame*, void*)>* Func;
+    void(* Func)(UObject*, FFrame*, void*);
     EFunctionFlags Flags;
     TArray<FDynamicProperty> Properties;
 };
@@ -132,7 +132,7 @@ private:
     TMap<FString, FDynamicScriptStruct*> DynamicStructs;
     TMap<FString, FDynamicEnum*> DynamicEnums;
     TMap<FString, FDynamicFunction*> DynamicFunctions;
-
+    
     RC::Function<UPackage*(UObject*, const TCHAR*)> CreatePackage;
     RC::Function<FField*(const FName&, const FFieldVariant*, const FName&, uint32)> FField_Construct;
     RC::Function<UObjectBase*(FUObjectAllocator*, int32, int32, bool)> FUObjectAllocator_AllocateUObject;
@@ -148,6 +148,7 @@ private:
     UClass* FindOrCreateClass(FDynamicClassGenerationContext& Context, const FString& ClassPath);
     UScriptStruct* FindOrCreateScriptStruct(FDynamicClassGenerationContext& Context, const FString& StructPath);
     UEnum* FindOrCreateEnum(FDynamicClassGenerationContext& Context, const FString& EnumPath);
+    UFunction* FindOrCreateFunction(FDynamicClassGenerationContext& Context, const FDynamicFunction& Function);
     UFunction* FindOrCreateFunction(FDynamicClassGenerationContext& Context, const FString& FunctionPath);
     
     bool ParseObjectConstructionData(const FDynamicClassGenerationContext& Context, const FString& ObjectPath, FDynamicObjectConstructionData& ObjectConstructionData);
@@ -161,7 +162,7 @@ private:
 
     FProperty* AddPropertyToStruct(FDynamicClassGenerationContext& Context, UStruct* Struct,
                                    const FDynamicProperty& Property, EPropertyFlags ExtraPropertyFlags = CPF_None);
-    void AddFunctionToClass(FDynamicClassGenerationContext& Context, UClass* Class, const FString& FunctionPath,
+    void AddFunctionToClass(FDynamicClassGenerationContext& Context, UClass* Class, const FDynamicFunction& Function,
                             EFunctionFlags ExtraFunctionFlags = FUNC_None);
 
     FProperty* BuildProperty(FDynamicClassGenerationContext& Context, FFieldVariant Owner,

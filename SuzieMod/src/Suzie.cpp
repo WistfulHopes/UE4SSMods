@@ -100,10 +100,9 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
     FMemory::Free(vtbl);
 
     // Add functions to the class
-    for (const auto& FunctionObjectPathValue : Class->Functions)
+    for (const auto& Function : Class->Functions)
     {
-        FString ChildPath = FunctionObjectPathValue.Path;
-        AddFunctionToClass(Context, NewClass, ChildPath);
+        AddFunctionToClass(Context, NewClass, Function);
     }
 
     // Bind parent class to this class and link properties to calculate their runtime derived data
@@ -132,7 +131,6 @@ UScriptStruct* Suzie::FindOrCreateScriptStruct(FDynamicClassGenerationContext& C
     }
 
     const auto Struct = DynamicStructs[StructPath];
-    checkf(StructDefinition.IsValid(), TEXT("Failed to find script struct object by path {}"), *StructPath);
     
     // Resolve parent struct for this struct before we attempt to create this struct
     UScriptStruct* SuperScriptStruct = nullptr;
@@ -263,6 +261,66 @@ UEnum* Suzie::FindOrCreateEnum(FDynamicClassGenerationContext& Context, const FS
     return NewEnum;
 }
 
+UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, const FDynamicFunction& Function)
+{
+    // Check if the function already exists
+    if (UFunction* ExistingFunction = UObjectGlobals::FindObject<UFunction>(nullptr, *Function.Path))
+    {
+        return ExistingFunction;
+    }
+    
+    FString ClassPathOrPackageName;
+    FString ObjectName;
+    ParseObjectPath(Function.Path, ClassPathOrPackageName, ObjectName);
+
+    // Function can be outered either to a class or to a package, we can decide based on whenever there is a separator in the path
+    UObject* FunctionOuterObject;
+    if (std::wstring(ClassPathOrPackageName.GetCharArray()).contains('.'))
+    {
+        // This is a class path because it is at least two levels deep. We do not need our outer to be registered, just to exist
+        FunctionOuterObject = FindOrCreateUnregisteredClass(Context, ClassPathOrPackageName);
+    }
+    else
+    {
+        // This is a package and this function is a top level function (most likely a delegate signature)
+        FunctionOuterObject = FindOrCreatePackage(ClassPathOrPackageName);
+    }
+
+    // Check if the function already exists in its parent object
+    if (UFunction* ExistingFunction = UObjectGlobals::FindObject<UFunction>(FunctionOuterObject, *ObjectName))
+    {
+        return ExistingFunction;
+    }
+    
+    // Convert struct flag names to the struct flags bitmask
+    EFunctionFlags FunctionFlags = FUNC_Native | Function.Flags;
+
+    // Have to temporarily mark the function as RF_ArchetypeObject to be able to create functions with UPackage as outer
+    UFunction* NewFunction = UObjectGlobals::NewObject<UFunction>(FunctionOuterObject, FName(*ObjectName, FNAME_Add), (EObjectFlags)(RF_Public | RF_MarkAsRootSet | RF_ArchetypeObject));
+    NewFunction->ClearFlags(RF_ArchetypeObject);
+    NewFunction->GetFunctionFlags() |= FunctionFlags;
+
+    // Update native function
+    NewFunction->GetFunc() = reinterpret_cast<std::function<void(UObject*, FFrame*, void*)>*>(Function.Func);
+
+    // Create function parameter properties (and function return value property)
+    for (const auto& Property : Function.Properties)
+    {
+        AddPropertyToStruct(Context, NewFunction, Property);
+    }
+
+    // This function will always be linked as a last element of the list, so it has no next element
+    NewFunction->GetNext() = nullptr;
+
+    // Bind the function and calculate property layout and function locals size
+    NewFunction->Bind();
+    UStruct_StaticLink(NewFunction, true);
+
+    Output::send<LogLevel::Verbose>(std::format(STR("Created function {} in outer {}\n"), *ObjectName, *FunctionOuterObject->GetName().c_str()));
+
+    return NewFunction;
+}
+
 UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, const FString& FunctionPath)
 {
     // Check if the function already exists
@@ -293,24 +351,22 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
     {
         return ExistingFunction;
     }
-    
-    const auto& FunctionDefinition = DynamicFunctions[FunctionPath];
-    checkf(FunctionDefinition.IsValid(), TEXT("Failed to find function object by path %s"), *FunctionPath);
+
+    const auto Function = DynamicFunctions[FunctionPath];
     
     // Convert struct flag names to the struct flags bitmask
-    EFunctionFlags FunctionFlags = FUNC_Native | FunctionDefinition->Flags;
+    EFunctionFlags FunctionFlags = FUNC_Native | Function->Flags;
 
     // Have to temporarily mark the function as RF_ArchetypeObject to be able to create functions with UPackage as outer
     UFunction* NewFunction = UObjectGlobals::NewObject<UFunction>(FunctionOuterObject, FName(*ObjectName, FNAME_Add), (EObjectFlags)(RF_Public | RF_MarkAsRootSet | RF_ArchetypeObject));
     NewFunction->ClearFlags(RF_ArchetypeObject);
     NewFunction->GetFunctionFlags() |= FunctionFlags;
 
-    // Since this function is not marked as Native, we have to initialize Script bytecode for it
-    // Most basic valid kismet bytecode for a function would be EX_Return EX_Nothing EX_EndOfScript, so generate that
-    NewFunction->GetFunc() = FunctionDefinition->Func;
+    // Update native function
+    NewFunction->GetFunc() = reinterpret_cast<std::function<void(UObject*, FFrame*, void*)>*>(Function->Func);
 
     // Create function parameter properties (and function return value property)
-    for (const auto& Property : FunctionDefinition->Properties)
+    for (const auto& Property : Function->Properties)
     {
         AddPropertyToStruct(Context, NewFunction, Property);
     }
@@ -345,21 +401,6 @@ void Suzie::Create()
     {
         FindOrCreateEnum(ClassGenerationContext, Enum.Key);
     }
-    for (const auto& Function : DynamicFunctions)
-    {
-        FindOrCreateFunction(ClassGenerationContext, Function.Key);
-    }
-    
-    // Construct classes that have been created but have not been constructed yet due to nobody referencing them
-    while (!ClassGenerationContext.ClassesPendingConstruction.IsEmpty())
-    {
-        TArray<FString> ClassPathsPendingConstruction;
-        ClassGenerationContext.ClassesPendingConstruction.GenerateValueArray(ClassPathsPendingConstruction);
-        for (const FString& ClassPath : ClassPathsPendingConstruction)
-        {
-            FindOrCreateClass(ClassGenerationContext, ClassPath);
-        }
-    }
 
     // Finalize all classes that we have created now. This includes assembling reference streams, creating default subobjects and populating them with data
     TArray<UClass*> ClassesPendingFinalization;
@@ -383,11 +424,6 @@ void Suzie::InsertStruct(const FString& Path, FDynamicScriptStruct* Struct)
 void Suzie::InsertEnum(const FString& Path, FDynamicEnum* Enum)
 {
     DynamicEnums.Add(Path, Enum);
-}
-
-void Suzie::InsertFunction(const FString& Path, FDynamicFunction* Function)
-{
-    DynamicFunctions.Add(Path, Function);
 }
 
 void Suzie::StaticInitialize()
@@ -732,10 +768,10 @@ FProperty* Suzie::AddPropertyToStruct(FDynamicClassGenerationContext& Context, U
     return nullptr;
 }
 
-void Suzie::AddFunctionToClass(FDynamicClassGenerationContext& Context, UClass* Class, const FString& FunctionPath,
+void Suzie::AddFunctionToClass(FDynamicClassGenerationContext& Context, UClass* Class, const FDynamicFunction& Function,
     EFunctionFlags ExtraFunctionFlags)
 {
-    if (UFunction* NewFunction = FindOrCreateFunction(Context, FunctionPath))
+    if (UFunction* NewFunction = FindOrCreateFunction(Context, Function))
     {
         // Append additional flags to the function
         NewFunction->GetFunctionFlags() |= ExtraFunctionFlags;
@@ -833,13 +869,13 @@ FProperty* Suzie::BuildProperty(FDynamicClassGenerationContext& Context, FFieldV
     }
     else if (FDelegateProperty* DelegateProperty = CastField<FDelegateProperty>(NewProperty))
     {
-        UFunction* SignatureFunction = FindOrCreateFunction(Context, Property.SignatureFunction);
+        UFunction* SignatureFunction = FindOrCreateFunction(Context, *Property.SignatureFunction);
         // Fall back to FOnTimelineEvent delegate signature in the engine if real delegate signature could not be found
         DelegateProperty->GetSignatureFunction() = SignatureFunction ? SignatureFunction : UObjectGlobals::FindObject<UFunction>(nullptr, TEXT("/Script/Engine.OnTimelineEvent__DelegateSignature"));
     }
     else if (FMulticastDelegateProperty* MulticastDelegateProperty = CastField<FMulticastDelegateProperty>(NewProperty))
     {
-        UFunction* SignatureFunction = FindOrCreateFunction(Context, Property.SignatureFunction);
+        UFunction* SignatureFunction = FindOrCreateFunction(Context, *Property.SignatureFunction);
         // Fall back to FOnTimelineEvent delegate signature in the engine if real delegate signature could not be found
         MulticastDelegateProperty->GetSignatureFunction() = SignatureFunction ? SignatureFunction : UObjectGlobals::FindObject<UFunction>(nullptr, TEXT("/Script/Engine.OnTimelineEvent__DelegateSignature"));
     }
