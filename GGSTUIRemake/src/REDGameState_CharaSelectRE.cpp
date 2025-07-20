@@ -74,7 +74,6 @@ void FCharaSelectPlayerParam::InitializeStruct()
                 .Offset = offsetof(FCharaSelectPlayerParam, bSelectCPU),
             }
         },
-        .Size = sizeof(FCharaSelectPlayerParam),
     };
 }
 

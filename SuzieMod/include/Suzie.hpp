@@ -65,7 +65,6 @@ struct FDynamicScriptStruct : FDynamicObject
     FString SuperStruct;
     EStructFlags StructFlags;
     TArray<FDynamicProperty> Properties;
-    int32 Size;
 };
 
 struct FDynamicEnum : FDynamicObject
