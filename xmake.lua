@@ -1,5 +1,7 @@
 includes("RE-UE4SS")
 includes("GGSTBPPlayer")
 includes("Coda")
-includes("StriveFrameData")
+includes("GGSTUIRemake")
+includes("GGSTCharaSlots")
 includes("GGSTModManager")
+includes("SuzieMod")
