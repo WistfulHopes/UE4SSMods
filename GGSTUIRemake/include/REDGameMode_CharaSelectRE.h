@@ -1,7 +1,6 @@
 #pragma once
 
 #include "AGameModeBase.hpp"
-#include "ObjectConstructor.h"
 #include "struct_util.h"
 #include "../../SuzieMod/include/Suzie.hpp"
 
@@ -11,6 +10,7 @@ using StringType = std::basic_string<CharType>;
 class AREDGameMode : public AGameModeBase
 {
     DECLARE_EXTERNAL_OBJECT_CLASS(AREDGameMode, RED)
+    
 private:
     char __padding[0x310]{};
 
@@ -27,6 +27,7 @@ class AREDGameMode_CharaSelectRE : public AREDGameMode
 
 public:
     static void AREDGameMode_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer);
-
+    static void InitializeClass();
+    
     static FDynamicClass Class;
 };

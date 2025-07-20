@@ -46,10 +46,9 @@ namespace GGSTMods
 
         auto on_unreal_init() -> void override
         {
-            AREDGameMode_CharaSelectRE::Class.ClassDefaultObjectPath = FString(STR("/Script/REDExtend.Default__REDGameMode_CharaSelectRE"));
-            AREDGameMode_CharaSelectRE::Class.SuperStruct = FString(STR("/Script/RED.REDGameMode"));
-            AREDGameState_CharaSelectRE::Class.ClassDefaultObjectPath = FString(STR("/Script/REDExtend.Default__REDGameState_CharaSelectRE"));
-            AREDGameState_CharaSelectRE::Class.SuperStruct = FString(STR("/Script/RED.REDGameState"));
+            AREDGameState_CharaSelectRE::InitializeClass();
+            AREDGameMode_CharaSelectRE::InitializeClass();
+            FCharaSelectPlayerParam::InitializeStruct();
 
             if (const auto Suzie = LoadLibrary(STR("./ue4ss/Mods/SuzieMod/dlls/main.dll")))
             {
@@ -58,6 +57,16 @@ namespace GGSTMods
                 {
                     InsertClass(FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE")), &AREDGameState_CharaSelectRE::Class);
                     InsertClass(FString(STR("/Script/REDExtend.REDGameMode_CharaSelectRE")), &AREDGameMode_CharaSelectRE::Class);
+                }
+                else
+                {
+                    Output::send<LogLevel::Error>(STR("Failed to find InsertClass!"));
+                    return;
+                }
+                typedef int (*InsertStruct_t)(FString, FDynamicScriptStruct*);
+                if (const auto InsertStruct = reinterpret_cast<InsertStruct_t>(GetProcAddress(Suzie, "InsertStruct")))
+                {
+                    InsertStruct(FString(STR("/Script/REDExtend.CharaSelectPlayerParam")), &FCharaSelectPlayerParam::Struct);
                 }
                 else
                 {

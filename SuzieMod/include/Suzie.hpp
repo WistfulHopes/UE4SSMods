@@ -12,6 +12,7 @@ struct FDynamicProperty
     FString Name;
     FString Type;
     int32 ArrayDim;
+    int32 Offset;
     FString Class;
     FString MetaClass;
     FString Struct;
@@ -140,6 +141,7 @@ private:
     RC::Function<TMap<FName, FFieldClass*>()> FFieldClass_GetNameToFieldClassMap;
     RC::Function<UObject*(UObject*, UPackage*, FName)> DuplicateObject;
     RC::Function<void(UClass*, bool)> UClass_AssembleReferenceTokenStream;
+    RC::Function<void(UStruct*, bool)> UStruct_StaticLink;
 
     UPackage* FindOrCreatePackage(const FString& PackageName);
     UClass* FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Context, const FString& ClassPath);
@@ -165,7 +167,7 @@ private:
     FProperty* BuildProperty(FDynamicClassGenerationContext& Context, FFieldVariant Owner,
                              const FDynamicProperty& Property, EPropertyFlags ExtraPropertyFlags = CPF_None);
 
-    int32 SetupPropertyOffset(FProperty* Context);
+    int32 SetupPropertyOffset(FProperty* Context, const FDynamicProperty& Property);
     UScriptStruct* GetSparseClassDataArchetypeStruct(UClass* Context);
 
     void Create();

@@ -24,7 +24,10 @@ using namespace RC;
 
 // Note that new objects can be created from other threads, but we only touch this map when creating dynamic classes,
 // so we do not need an explicit mutex to guard the access to it during class initialization
-static TMap<UClass*, FDynamicClassConstructionData> DynamicClassConstructionData;
+namespace
+{
+    TMap<UClass*, FDynamicClassConstructionData> DynamicClassConstructionData;
+}
 
 // Note that new objects can be created from other threads, but we only touch this map when creating dynamic classes,
 // so we do not need an explicit mutex to guard the access to it during class initialization
@@ -45,7 +48,7 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
         NewClass = FindOrCreateUnregisteredClass(Context, ClassPath);
         if (NewClass == nullptr)
         {
-            Output::send<LogLevel::Error>(std::format(STR("Failed to create dynamic class: {}"), *ClassPath));
+            Output::send<LogLevel::Error>(std::format(STR("Failed to create dynamic class: {}\n"), *ClassPath));
             return nullptr;
         }
     }
@@ -57,7 +60,18 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
 
     TArray<const FProperty*> PropertiesWithDestructor;
     TArray<const FProperty*> PropertiesWithConstructor;
-    FArchive EmptyPropertyLinkArchive;
+    uintptr_t* EmptyPropertyLinkArchive = (uintptr_t*)FMemory::Malloc(0x90);
+
+    struct FArchive_vtbl
+    {
+        char _padding[0x170];
+        void* Preload;
+    };
+    
+    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x178);
+
+    vtbl->Preload = []{};
+    *EmptyPropertyLinkArchive = (uintptr_t)vtbl;
 
     // Add properties to the class
     for (auto& Property : Class->Properties)
@@ -67,8 +81,8 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
         if (FProperty* CreatedProperty = AddPropertyToStruct(Context, NewClass, Property, ExtraPropertyFlags))
         {
             // Because this is a native class, we have to link the property offset manually here rather than expecting StaticLink to do it for us
-            CreatedProperty->LinkInternal(EmptyPropertyLinkArchive);
-            NewClass->GetPropertiesSize() = SetupPropertyOffset(CreatedProperty);
+            CreatedProperty->LinkInternal(*(FArchive*)EmptyPropertyLinkArchive);
+            NewClass->GetPropertiesSize() = SetupPropertyOffset(CreatedProperty, Property);
             NewClass->GetMinAlignment() = FMath::Max(NewClass->GetMinAlignment(), CreatedProperty->GetMinAlignment());
 
             // Add property into the constructor/destructor lists based on its flags
@@ -82,6 +96,8 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
             }
         }
     }
+    FMemory::Free(EmptyPropertyLinkArchive);
+    FMemory::Free(vtbl);
 
     // Add functions to the class
     for (const auto& FunctionObjectPathValue : Class->Functions)
@@ -92,8 +108,7 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
 
     // Bind parent class to this class and link properties to calculate their runtime derived data
     NewClass->Bind();
-    auto ArDummy = FArchive();
-    NewClass->Link(ArDummy, false);
+    UStruct_StaticLink(NewClass, false);
     NewClass->GetSparseClassDataStruct() = GetSparseClassDataArchetypeStruct(NewClass);
 
     // Stash the properties that need to be constructed on the class data so polymorphic constructor can access them easily
@@ -146,18 +161,50 @@ UScriptStruct* Suzie::FindOrCreateScriptStruct(FDynamicClassGenerationContext& C
         NewStruct->SetSuperStruct(SuperScriptStruct);
         NewStruct->GetStructFlags() = (EStructFlags) ((int32)NewStruct->GetStructFlags() | (SuperScriptStruct->GetStructFlags() & STRUCT_Inherit) | Struct->StructFlags);
     }
+    
+    TArray<const FProperty*> PropertiesWithDestructor;
+    TArray<const FProperty*> PropertiesWithConstructor;
+    uintptr_t* EmptyPropertyLinkArchive = (uintptr_t*)FMemory::Malloc(0x90);
 
-    for (const auto& property : Struct->Properties)
+    struct FArchive_vtbl
+    {
+        char _padding[0x170];
+        void* Preload;
+    };
+    
+    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x178);
+
+    vtbl->Preload = []{};
+    *EmptyPropertyLinkArchive = (uintptr_t)vtbl;
+
+    for (const auto& Property : Struct->Properties)
     {
         // We want all properties to be editable, visible and blueprint assignable
         const EPropertyFlags ExtraPropertyFlags = CPF_Edit | CPF_BlueprintVisible | CPF_BlueprintAssignable;
-        AddPropertyToStruct(Context, NewStruct, property, ExtraPropertyFlags);
+        if (FProperty* CreatedProperty = AddPropertyToStruct(Context, NewStruct, Property, ExtraPropertyFlags))
+        {
+            // Because this is a native class, we have to link the property offset manually here rather than expecting StaticLink to do it for us
+            CreatedProperty->LinkInternal(*(FArchive*)EmptyPropertyLinkArchive);
+            NewStruct->GetPropertiesSize() = SetupPropertyOffset(CreatedProperty, Property);
+            NewStruct->GetMinAlignment() = FMath::Max(NewStruct->GetMinAlignment(), CreatedProperty->GetMinAlignment());
+
+            // Add property into the constructor/destructor lists based on its flags
+            if (!CreatedProperty->HasAnyPropertyFlags(CPF_IsPlainOldData | CPF_NoDestructor))
+            {
+                PropertiesWithDestructor.Add(CreatedProperty);
+            }
+            if (!CreatedProperty->HasAnyPropertyFlags(CPF_ZeroConstructor))
+            {
+                PropertiesWithConstructor.Add(CreatedProperty);
+            }
+        }
     }
+    FMemory::Free(EmptyPropertyLinkArchive);
+    FMemory::Free(vtbl);
     
     // Bind the newly created struct and link it to assign property offsets and calculate the size
     NewStruct->Bind();
-    auto ArDummy = FArchive();
-    NewStruct->Link(ArDummy, true);
+    UStruct_StaticLink(NewStruct, false);
 
     // The engine does not gracefully handle empty structs, so force the struct size to be at least one byte
     if (NewStruct->GetPropertiesSize() == 0)
@@ -230,7 +277,6 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
 
     // Function can be outered either to a class or to a package, we can decide based on whenever there is a separator in the path
     UObject* FunctionOuterObject;
-    int32 PackageNameSeparatorIndex{};
     if (std::wstring(ClassPathOrPackageName.GetCharArray()).contains('.'))
     {
         // This is a class path because it is at least two levels deep. We do not need our outer to be registered, just to exist
@@ -264,7 +310,7 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
     NewFunction->GetFunc() = FunctionDefinition->Func;
 
     // Create function parameter properties (and function return value property)
-    for (const auto Property : FunctionDefinition->Properties)
+    for (const auto& Property : FunctionDefinition->Properties)
     {
         AddPropertyToStruct(Context, NewFunction, Property);
     }
@@ -274,10 +320,9 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
 
     // Bind the function and calculate property layout and function locals size
     NewFunction->Bind();
-    auto ArDummy = FArchive();
-    NewFunction->Link(ArDummy, true);
+    UStruct_StaticLink(NewFunction, true);
 
-    Output::send<LogLevel::Verbose>(std::format(STR("Created function {} in outer {}"), *ObjectName, *FunctionOuterObject->GetName().c_str()));
+    Output::send<LogLevel::Verbose>(std::format(STR("Created function {} in outer {}\n"), *ObjectName, *FunctionOuterObject->GetName().c_str()));
 
     return NewFunction;
 }
@@ -449,6 +494,17 @@ void Suzie::Initialize()
         {
         },
     };
+    const SignatureContainer UStruct_StaticLink_Sig{
+        {{"48 89 5C 24 ? 57 48 81 EC ? ? ? ? 48 8B F9 0F B6 DA"}},
+        [&](const SignatureContainer& self)
+        {
+            UStruct_StaticLink.assign_address(self.get_match_address());
+            return true;
+        },
+        [](SignatureContainer& self)
+        {
+        },
+    };
 
     std::vector<SignatureContainer> signature_containers;
     signature_containers.push_back(CreatePackage_Sig);
@@ -459,6 +515,7 @@ void Suzie::Initialize()
     signature_containers.push_back(DuplicateObject_Sig);
     signature_containers.push_back(UClass_AssembleReferenceTokenStream_sig);
     signature_containers.push_back(UClass_Ctor_Sig);
+    signature_containers.push_back(UStruct_StaticLink_Sig);
 
     SinglePassScanner::SignatureContainerMap signature_containers_map;
     signature_containers_map.emplace(ScanTarget::MainExe, signature_containers);
@@ -669,7 +726,7 @@ FProperty* Suzie::AddPropertyToStruct(FDynamicClassGenerationContext& Context, U
             // This is the first property in the struct, assign it as a head of the linked property list
             Struct->GetChildProperties() = NewProperty;
         }
-        Output::send<LogLevel::Verbose>(std::format(STR("Added property {} to struct {}"), NewProperty->GetName(), Struct->GetName()));
+        Output::send<LogLevel::Verbose>(std::format(STR("Added property {} to struct {}\n"), NewProperty->GetName(), Struct->GetName()));
         return NewProperty;
     }
     return nullptr;
@@ -705,7 +762,7 @@ void Suzie::AddFunctionToClass(FDynamicClassGenerationContext& Context, UClass* 
         // Add the function to the function lookup for the class
         Class->GetFuncMap().Add(FName(NewFunction->GetName(), FNAME_Add), NewFunction);
 
-        Output::send<LogLevel::Verbose>(std::format(STR("Added function {} to class {}"), NewFunction->GetName(), Class->GetName()));
+        Output::send<LogLevel::Verbose>(std::format(STR("Added function {} to class {}\n"), NewFunction->GetName(), Class->GetName()));
     }
 }
 
@@ -718,10 +775,10 @@ FProperty* Suzie::BuildProperty(FDynamicClassGenerationContext& Context, FFieldV
     const FString PropertyName = Property.Name;
     const FString PropertyType = Property.Type;
 
-    FProperty* NewProperty = CastField<FProperty>(FField_Construct(FName(*PropertyType), &Owner, FName(*PropertyName), RF_Public));
+    FProperty* NewProperty = CastField<FProperty>(FField_Construct(FName(*PropertyType, FNAME_Add), &Owner, FName(*PropertyName, FNAME_Add), RF_Public));
     if (NewProperty == nullptr)
     {
-        Output::send<LogLevel::Error>(std::format(STR("Failed to create property of type {}: not supported"), *PropertyName));
+        Output::send<LogLevel::Error>(std::format(STR("Failed to create property of type {}: not supported\n"), *PropertyName));
         return nullptr;
     }
     
@@ -819,19 +876,9 @@ FProperty* Suzie::BuildProperty(FDynamicClassGenerationContext& Context, FFieldV
 }
 
 
-int32 Suzie::SetupPropertyOffset(FProperty* Context)
+int32 Suzie::SetupPropertyOffset(FProperty* Context, const FDynamicProperty& Property)
 {
-    UObject* OwnerUObject = Context->GetOutermostOwner();
-    if (OwnerUObject)
-    {
-        auto OwnerStruct = static_cast<UStruct*>(OwnerUObject);
-        Context->GetOffset_Internal() = Align(OwnerStruct->GetPropertiesSize(), Context->GetMinAlignment());
-    }
-    else
-    {
-        Context->GetOffset_Internal() = Align(0, Context->GetMinAlignment());
-    }
-    
+    Context->GetOffset_Internal() = Property.Offset;    
     return Context->GetOffset_Internal() + Context->GetSize();
 }
 
