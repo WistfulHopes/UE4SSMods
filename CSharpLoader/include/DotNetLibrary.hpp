@@ -1,8 +1,5 @@
 #pragma once
 
-#include <Common.hpp>
-#include <cstdint>
-#include <CoreCLR.hpp>
 #include <DynamicOutput/OutputDevice.hpp>
 #include <UnrealCoreStructs.hpp>
 #include <Unreal/Quat.hpp>
@@ -176,20 +173,19 @@ namespace RC::DotNetLibrary
 
     class CSHARPLOADER_API Runtime
     {
-        std::wstring m_runtime_directory;
-
-        static inline CoreCLR* CLR;
-
         static inline std::vector<void(*)()> unreal_init_callbacks;
         static inline std::vector<void(*)()> update_callbacks;
 
+        static inline bool unreal_initialized = false;
+
     public:
-        Runtime(std::wstring runtime_directory) : m_runtime_directory(runtime_directory) {}
+        Runtime() {}
 
         static auto log(LogLevel::LogLevel Level, const char* Message);
 
         static void add_unreal_init_callback(void (*Callback)());
         static void add_update_callback(void (*Callback)());
+        static bool is_unreal_init();
         
         auto initialize() -> void;
         auto load_assemblies() -> void;

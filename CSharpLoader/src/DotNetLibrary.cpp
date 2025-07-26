@@ -28,59 +28,14 @@ namespace RC::DotNetLibrary
     {
         update_callbacks.push_back(Callback);
     }
-    
+
+    bool Runtime::is_unreal_init()
+    {
+        return unreal_initialized;
+    }
+
     auto Runtime::initialize() -> void
     {
-        int success = 0;
-        CLR = new CoreCLR(&success);
-
-        if (!success)
-        {
-            Output::send<LogLevel::Error>(STR("Failed to initialize CoreCLR\n"));
-            CLR = nullptr;
-            return;
-        }
-
-        if (!std::filesystem::exists(m_runtime_directory))
-        {
-            Output::send<LogLevel::Error>(STR("Could not find UE4SSDotNetRuntime\n"));
-            CLR = nullptr;
-            return;
-        }
-
-        const string_t runtime_config_path = m_runtime_directory + L"\\UE4SSDotNetRuntime.runtimeconfig.json";
-
-        if (!std::filesystem::exists(runtime_config_path))
-        {
-            Output::send<LogLevel::Error>(STR("The runtime configuration does not exist for UE4SSDotNetRuntime\n"));
-            CLR = nullptr;
-            return;
-        }
-
-        if (!CLR->load_runtime(runtime_config_path))
-        {
-            Output::send<LogLevel::Warning>(STR("Failed to load .NET Core Runtime.\n"
-                                              "If using Reloaded II, disregard this message."));
-            CLR = nullptr;
-            return;
-        }
-
-        const auto runtime_assembly_path = m_runtime_directory + L"\\UE4SSDotNetRuntime.dll";
-        const auto runtime_type_name = L"UE4SSDotNetRuntime.Runtime.Core, UE4SSDotNetRuntime";
-        const auto runtime_method_name = L"ManagedCommand";
-
-        if (!CLR->load_assembly_and_get_function_pointer(runtime_assembly_path.c_str(),
-                                                        runtime_type_name,
-                                                        runtime_method_name,
-                                                        UNMANAGEDCALLERSONLY_METHOD,
-                                                        nullptr,
-                                                        reinterpret_cast<void**>(&ManagedCommand)))
-        {
-            Output::send<LogLevel::Error>(STR("Host runtime assembly loading failed\n"));
-            CLR = nullptr;
-            return;
-        }
-
         if (ManagedCommand)
         {
             Shared::RuntimeFunctions[0] = (void*)&Runtime::log;
@@ -95,28 +50,20 @@ namespace RC::DotNetLibrary
             else
             {
                 Output::send<LogLevel::Error>(STR("Host runtime assembly initialization failed!\n"));
-                CLR = nullptr;
-                return;
             }
-
-            return;
         }
-
-        CLR = nullptr;
     }
 
     auto Runtime::load_assemblies() -> void
     {
-        if (!CLR) return;
-        ManagedCommand(Command(CommandType::LoadAssemblies));
+        // ManagedCommand(Command(CommandType::LoadAssemblies));
         start_mods();
     }
 
     auto Runtime::unload_assemblies() -> void
     {
-        if (!CLR) return;
         stop_mods();
-        ManagedCommand(Command(CommandType::UnloadAssemblies));
+        // ManagedCommand(Command(CommandType::UnloadAssemblies));
     }
 
     auto Runtime::start_mods() -> void
@@ -201,6 +148,8 @@ namespace RC::DotNetLibrary
 
     auto Runtime::fire_unreal_init() -> void
     {
+        unreal_initialized = true;
+        
         if (Shared::Events[UnrealInit]) ManagedCommand(Command(Shared::Events[UnrealInit]));
 
         for (const auto callback : unreal_init_callbacks) callback();
@@ -843,13 +792,13 @@ namespace RC::DotNetLibrary
 
         void UnEnum::ForEachName(UEnum* Enum, void (*Callback)(const char* Name, int Value))
         {
-            for (auto& [name, value] : Enum->ForEachName())
+            for (auto& pair : Enum->ForEachName())
             {
-                const wchar_t* string = name.ToString().c_str();
+                const wchar_t* string = pair.Key.ToString().c_str();
                 char* converted = static_cast<char*>(malloc(wcslen(string)));
                 wcstombs(converted, string, wcslen(string));
 
-                Callback(converted, value);
+                Callback(converted, pair.Value);
             }
         }
 
@@ -867,7 +816,7 @@ namespace RC::DotNetLibrary
         void UnEnum::InsertIntoNames(UEnum* Enum, char* Name, int Index, int64 Value, bool ShiftValues)
         {
             const Unreal::FName key{to_wstring(Name), FNAME_Add};
-            const auto pair = TPair{key, Value};
+            const auto pair = TPair<Unreal::FName, int64>{key, Value};
 
             Enum->InsertIntoNames(pair, Index, ShiftValues);
         }

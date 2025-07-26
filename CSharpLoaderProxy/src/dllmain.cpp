@@ -1,6 +1,7 @@
 #include <Mod/CppUserModBase.hpp>
 #include <UE4SSProgram.hpp>
 #include <DotNetLibrary.hpp>
+#include <Windows.h>
 
 using namespace RC::Unreal;
 
@@ -38,11 +39,8 @@ public:
             Output::send<LogLevel::Error>(STR("LoadLibrary failed, error = {}\n"), GetLastError());
             return;
         }
-
-        std::filesystem::path runtime_path(module_path);
-        runtime_path = runtime_path.parent_path() / "DotNetRuntime";
         
-        m_runtime = new DotNetLibrary::Runtime(runtime_path);
+        m_runtime = new DotNetLibrary::Runtime();
         m_runtime->initialize();
         
         // Do not change this unless you want to target a UE4SS version
