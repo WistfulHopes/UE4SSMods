@@ -4,6 +4,7 @@
 #include <Mod/CppUserModBase.hpp>
 #include <UE4SSProgram.hpp>
 
+#include "AActor.hpp"
 #include "safetyhook.hpp"
 #include "struct_util.h"
 #include "UObject.hpp"
@@ -588,15 +589,15 @@ class Coda : public CppUserModBase
 {
 private:
     static inline SafetyHookInline UkemiCheck;
-    static inline SafetyHookMid CmnActUkemi;
     static inline SafetyHookInline ExecuteDamage;
     static inline SafetyHookInline OnFrameStep;
     static inline SafetyHookInline IsCounterHitByGuardCounter;
     static inline SafetyHookInline GetAirStunTime;
     static inline SafetyHookInline GetSpawnPlayerInfoList;
     static inline SafetyHookInline SetDamageParam;
-    static inline SafetyHookInline CalcAtkHitStopTime;
     static inline SafetyHookInline CalcAtkAirStunTime;
+    static inline SafetyHookInline GetEnemyHitStopTime;
+    static inline SafetyHookMid CmnActUkemi;
     static inline SafetyHookMid SetGuardBackSpeed_JG;
     static inline SafetyHookMid PlayerInitializeOnEasyReset;
     static inline SafetyHookMid HitCollision;
@@ -633,18 +634,14 @@ public:
 
     ~Coda() override
     {
-        int TechXFront = 50000;
-        int TechXBack = 0;
-        int TechYBack = 150;
+        int WorldWidthScale = 1000;
         int ScreenZoomScale = 1000;
         int InstantBlockXPushback = 0;
         int InstantBlockXAirPushback = 0;
         int InstantBlockWindow = 2;
 
-        patch_exe_bytes(DBMTable + 162 * 4, (PBYTE)&TechXFront, 4);
-        patch_exe_bytes(DBMTable + 163 * 4, (PBYTE)&TechXBack, 4);
-        patch_exe_bytes(DBMTable + 166 * 4, (PBYTE)&TechYBack, 4);
-        patch_exe_bytes(DBMTable + 504 * 4, (PBYTE)&ScreenZoomScale, 4);
+        patch_exe_bytes(DBMTable + 501 * 4, (PBYTE)&WorldWidthScale, 4);
+        patch_exe_bytes(DBMTable + 505 * 4, (PBYTE)&ScreenZoomScale, 4);
         patch_exe_bytes(DBMTable + 174 * 4, (PBYTE)&InstantBlockXPushback, 4);
         patch_exe_bytes(DBMTable + 178 * 4, (PBYTE)&InstantBlockXAirPushback, 4);
         patch_exe_bytes(DBMTable + 176 * 4, (PBYTE)&InstantBlockWindow, 4);
@@ -960,51 +957,25 @@ public:
         return result;
     }
 
-    static int calc_atk_hit_stop_time(CAtkParam* ctx, int level, uint32_t calcFlag)
-    {
-        const auto result = ctx->hitstop;
-
-        if (result == INT_MAX)
-        {
-            if (level == -1) level = ctx->atk_level;
-            return get_hit_stop_time(level, calcFlag);
-        }
-
-        return result;
-    }
-
-    static int get_hit_stop_time(int level, bool isCH)
+    static int get_enemy_hit_stop_time(int level)
     {
         level = FMath::Clamp(level, 0, 5);
-        int result;
         switch (level)
         {
         case 0:
         default:
-            result = 11;
-            break;
+            return 0;
         case 1:
-            result = 12;
-            break;
+            return 2;
         case 2:
-            result = 13;
-            if (isCH) result += 2;
-            break;
+            return 4;
         case 3:
-            result = 14;
-            if (isCH) result += 4;
-            break;
+            return 8;
         case 4:
-            result = 15;
-            if (isCH) result += 6;
-            break;
+            return 12;
         case 5:
-            result = 20;
-            if (isCH) result += 8;
-            break;
+            return 14;
         }
-
-        return result;
     }
 
     auto on_unreal_init() -> void override
@@ -1015,21 +986,16 @@ public:
             {
                 DBMTable = *reinterpret_cast<int*>(self.get_match_address() + 0x2) + (uintptr_t)self.get_match_address()
                     + 6 - 283 * 4;
-                Output::send(std::format(STR("{:X}"), DBMTable));
 
                 // Data modification
-                int TechXFront = 15000;
-                int TechXBack = -15000;
-                int TechYBack = 50;
+                int WorldWidthScale = 1000;
                 int ScreenZoomScale = 1100;
                 int InstantBlockXPushback = 500;
                 int InstantBlockXAirPushback = 750;
                 int InstantBlockWindow = 8;
 
-                patch_exe_bytes(DBMTable + 162 * 4, (PBYTE)&TechXFront, 4);
-                patch_exe_bytes(DBMTable + 163 * 4, (PBYTE)&TechXBack, 4);
-                patch_exe_bytes(DBMTable + 166 * 4, (PBYTE)&TechYBack, 4);
-                patch_exe_bytes(DBMTable + 504 * 4, (PBYTE)&ScreenZoomScale, 4);
+                patch_exe_bytes(DBMTable + 501 * 4, (PBYTE)&WorldWidthScale, 4);
+                patch_exe_bytes(DBMTable + 505 * 4, (PBYTE)&ScreenZoomScale, 4);
                 patch_exe_bytes(DBMTable + 174 * 4, (PBYTE)&InstantBlockXPushback, 4);
                 patch_exe_bytes(DBMTable + 178 * 4, (PBYTE)&InstantBlockXAirPushback, 4);
                 patch_exe_bytes(DBMTable + 176 * 4, (PBYTE)&InstantBlockWindow, 4);
@@ -1082,7 +1048,7 @@ public:
             },
             [&](const SignatureContainer& self)
             {
-                // ExecuteDamage = safetyhook::create_inline(self.get_match_address(), &execute_damage);
+                ExecuteDamage = safetyhook::create_inline(self.get_match_address(), &execute_damage);
                 return true;
             },
             [](SignatureContainer& self)
@@ -1112,7 +1078,7 @@ public:
             {{.signature = "81 B9 ? ? ? ? ? ? ? ? 0F 9D C0"}},
             [&](const SignatureContainer& self)
             {
-                // IsCounterHitByGuardCounter = safetyhook::create_inline(self.get_match_address(), risc_counter);
+                IsCounterHitByGuardCounter = safetyhook::create_inline(self.get_match_address(), risc_counter);
                 return true;
             },
             [](SignatureContainer& self)
@@ -1368,15 +1334,16 @@ public:
             },
         };
 
-        const SignatureContainer calc_atk_hit_stop_time_sig{
+        const SignatureContainer get_enemy_hit_stop_time_sig{
             {
                 {
-                    .signature = "8B C2 8B 51 ? 81 FA ? ? ? ? 75 ? 83 F8"
+                    .signature =
+                    "85 C9 79 ? 33 C0 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 B8 ? ? ? ? 3B C8 0F 4C C1 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 CC CC CC CC CC CC 85 C9 79 ? 33 C0 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 B8 ? ? ? ? 3B C8 0F 4C C1 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 CC CC CC CC CC CC 85 C9 79 ? 33 C0 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 B8 ? ? ? ? 3B C8 0F 4C C1 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 CC CC CC CC CC CC 85 C9 79 ? 33 C0 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 B8 ? ? ? ? 3B C8 0F 4C C1 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 CC CC CC CC CC CC 85 C9 79 ? 33 C0 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 B8 ? ? ? ? 3B C8 0F 4C C1 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 CC CC CC CC CC CC 85 C9 79 ? 33 C0 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 B8 ? ? ? ? 3B C8 0F 4C C1 48 8D 0D ? ? ? ? 48 98 8B 04 81 C3 CC CC CC CC CC CC 40 53"
                 }
             },
             [&](const SignatureContainer& self)
             {
-                CalcAtkHitStopTime = safetyhook::create_inline(self.get_match_address(), calc_atk_hit_stop_time);
+                GetEnemyHitStopTime = safetyhook::create_inline(self.get_match_address(), get_enemy_hit_stop_time);
                 return true;
             },
             [](SignatureContainer& self)
@@ -1570,10 +1537,11 @@ public:
         signature_containers.push_back(dbm_table_sig);
         signature_containers.push_back(ukemi_check_sig);
         signature_containers.push_back(cmn_act_ukemi_sig);
-        signature_containers.push_back(execute_damage_sig);
+        // signature_containers.push_back(execute_damage_sig);
         signature_containers.push_back(on_frame_step_sig);
         signature_containers.push_back(risc_counter_sig);
         signature_containers.push_back(get_air_stun_time_sig);
+        signature_containers.push_back(get_enemy_hit_stop_time_sig);
         signature_containers.push_back(set_damage_param_sig);
         signature_containers.push_back(calc_atk_air_stun_time_sig);
         signature_containers.push_back(set_guard_back_speed_jg_sig);
