@@ -401,6 +401,10 @@ void Suzie::Create()
     {
         FindOrCreateEnum(ClassGenerationContext, Enum.Key);
     }
+    for (const auto& Function : DynamicFunctions)
+    {
+        FindOrCreateFunction(ClassGenerationContext, Function.Key);
+    }
 
     // Finalize all classes that we have created now. This includes assembling reference streams, creating default subobjects and populating them with data
     TArray<UClass*> ClassesPendingFinalization;
@@ -424,6 +428,11 @@ void Suzie::InsertStruct(const FString& Path, FDynamicScriptStruct* Struct)
 void Suzie::InsertEnum(const FString& Path, FDynamicEnum* Enum)
 {
     DynamicEnums.Add(Path, Enum);
+}
+
+void Suzie::InsertFunction(const FString& Path, FDynamicFunction* Function)
+{
+    DynamicFunctions.Add(Path, Function);
 }
 
 void Suzie::StaticInitialize()
@@ -497,17 +506,6 @@ void Suzie::Initialize()
         {
         },
     };
-    const SignatureContainer DuplicateObject_Sig{
-        {{"48 89 5C 24 ? 57 48 83 EC ? 49 8B D8 48 8B F9 48 85 C9"}},
-        [&](const SignatureContainer& self)
-        {
-            DuplicateObject.assign_address(self.get_match_address());
-            return true;
-        },
-        [](SignatureContainer& self)
-        {
-        },
-    };
     const SignatureContainer UClass_AssembleReferenceTokenStream_sig{
         {{"48 8B C4 55 56 48 8D 68 ? 48 81 EC ? ? ? ? 48 89 58 ? 48 8D B1"}},
         [&](const SignatureContainer& self)
@@ -548,7 +546,6 @@ void Suzie::Initialize()
     signature_containers.push_back(FUObjectAllocator_AllocateUObject_Sig);
     signature_containers.push_back(GUObjectAllocator_Sig);
     signature_containers.push_back(FFieldClass_GetNameToFieldClassMap_Sig);
-    signature_containers.push_back(DuplicateObject_Sig);
     signature_containers.push_back(UClass_AssembleReferenceTokenStream_sig);
     signature_containers.push_back(UClass_Ctor_Sig);
     signature_containers.push_back(UStruct_StaticLink_Sig);
@@ -695,25 +692,12 @@ void Suzie::FinalizeClass(FDynamicClassGenerationContext& Context, UClass* Class
     {
         FinalizeClass(Context, ParentClass);
     }
-    
-    FDynamicClassConstructionData& ClassConstructionData = DynamicClassConstructionData.FindOrAdd(Class);
-    
+        
     // Assemble reference token stream for garbage collector
     UClass_AssembleReferenceTokenStream(Class, true);
     // Create class default object now that we have class object construction data
     // UClass::CreateDefaultObject
     (*reinterpret_cast<UObject*(**)(UClass*)>(*reinterpret_cast<uintptr_t*>(Class) + 0x390))(Class);
-    UObject* ClassDefaultObject = Class->GetClassDefaultObject();
-
-    // Create an archetype by duplicating the CDO. We will use that archetype instead of CDO for priming the instances with correct values
-    // Do not create archetypes for NetConnection-derived classes, they have faulty shutdown logic leading to a crash on exit
-    const FString ArchetypeObjectName = FString((STR("InitializationArchetype__") + Class->GetName()).c_str());
-    {
-        ClassConstructionData.DefaultObjectArchetype = DuplicateObject(ClassDefaultObject, static_cast<UPackage*>(ClassDefaultObject->GetOutermost()), FName(*ArchetypeObjectName, FNAME_Add));
-    }
-    ClassConstructionData.DefaultObjectArchetype->ClearFlags(RF_ClassDefaultObject);
-    ClassConstructionData.DefaultObjectArchetype->SetFlags(static_cast<EObjectFlags>(RF_Public | RF_ArchetypeObject | RF_Transactional));
-    ClassConstructionData.DefaultObjectArchetype->SetRootSet();
 }
 
 void Suzie::ParseObjectPath(const FString& ObjectPath, FString& OutOuterObjectPath, FString& OutObjectName)

@@ -139,7 +139,6 @@ private:
     RC::Function<void*(UClass*, int32, FName, int32, int32, EClassFlags, EClassCastFlags, const TCHAR*, EObjectFlags,
                        void (*)(const FObjectInitializer*), UObject*(*)(void*), void (*)(UObject*, void*))> UClass_Ctor;
     RC::Function<TMap<FName, FFieldClass*>()> FFieldClass_GetNameToFieldClassMap;
-    RC::Function<UObject*(UObject*, UPackage*, FName)> DuplicateObject;
     RC::Function<void(UClass*, bool)> UClass_AssembleReferenceTokenStream;
     RC::Function<void(UStruct*, bool)> UStruct_StaticLink;
 
