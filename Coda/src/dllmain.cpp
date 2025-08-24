@@ -10,6 +10,8 @@
 #include "UObject.hpp"
 #include "SigScanner/SinglePassSigScanner.hpp"
 
+#define RIOT
+
 using namespace RC::Unreal;
 
 // Mod
@@ -290,51 +292,57 @@ class OBJ_CCharBase
 public:
     FIELD(0x28, int, m_ObjTimer);
     FIELD(0x4C, int, m_SideID);
-    FIELD(0x1A8, int, m_ObjFlag);
-    FIELD(0x1B0, int, m_ObjFlag3);
+    FIELD(0x50, int, m_MemberID);
+    FIELD(0x1A8, unsigned int, m_ObjFlag);
+    FIELD(0x1B0, unsigned int, m_ObjFlag3);
     FIELD(0x1C4, int, m_ActionTime);
     FIELD(0x280, int, m_HitStopTime);
     FIELD(0x28C, int, m_HitStopTimeBySousai);
-    FIELD(0x2C0, OBJ_CCharBase*, m_TargetObj);
+    FIELD(0x2B0, OBJ_CCharBase*, m_pParentPly);
+    FIELD(0x2C0, OBJ_CCharBase*, m_pTargetObj);
+    FIELD(0x3A0, unsigned int, m_CollisionFlag3);
     FIELD(0x3AC, int, m_PosY);
+    FIELD(0x3B0, int, m_PosZ);
     FIELD(0x4C8, int, m_SpeedX);
     FIELD(0x4CC, int, m_SpeedY);
     FIELD(0x4D0, int, m_Gravity);
     FIELD(0x750, CAtkParam, m_AtkParam);
-    FIELD(0xB60, CAtkParamEx, m_AtkParamNH);
-    FIELD(0xC20, CAtkParamEx, m_AtkParamCH);
-    FIELD(0xD00, CAtkParam, m_DmgParam);
-    FIELD(0x1110, CAtkParamEx, m_DmgParamEx);
-    FIELD(0x11DC, int, m_bIsCounterHit);
-    FIELD(0x11EC, int, m_MutekiDagekiTime);
-    ARRAY_FIELD(0x13D8, CInterruptInfo[106], m_InterruptInfo);
-    FIELD(0x38B4, CActionRequestInfo, m_ActionRequestInfoReg);
-    FIELD(0x62D8, unsigned int, m_PlayerFlag2);
-    FIELD(0x62EC, unsigned int, m_CtrlDir);
-    FIELD(0x62F0, unsigned int, m_EnableFlag);
-    FIELD(0x62F4, unsigned int, m_Enable2Flag);
-    FIELD(0x6310, unsigned int, m_GuardStopCount);
-    FIELD(0x9AD8, int, m_StunCount);
-    FIELD(0x9B10, int, ply_JumpSpeed);
-    FIELD(0x9B4C, int, ply_Kizetsu);
-    FIELD(0xC3F4, int, m_ComboCount);
-    FIELD(0xC41C, int, m_ComboTimeWithOutAnten);
-    FIELD(0xC474, bool, m_IsImperfectCombo);
-    FIELD(0xC476, bool, m_UkemiMiss);
-    FIELD(0xC488, int, m_KizetsuPoint);
-    FIELD(0xC48C, int, m_KizetsuMax);
-    FIELD(0xC490, int, m_KizetsuTime);
-    FIELD(0xC494, int, m_KizetsuTimeMax);
-    FIELD(0xC4DC, ID_CMNACT, m_CurCmnActionID);
-    FIELD(0xCA00, int, m_ExKizetsu);
-    FIELD(0xCA20, int, m_DustHomingTime);
-    FIELD(0xCA24, int, m_DustHomingSubTime);
-    FIELD(0xCA6C, int, m_GuardBalance);
-    FIELD(0xF030, CAtkParam, m_AtkParamForGGThrowStack);
-    FIELD(0xF440, CAtkParamEx, m_AtkParamCHForGGThrowStack);
-    FIELD(0xF520, CAtkParamEx, m_AtkParamNHForGGThrowStack);
-    FIELD(0x107F8, int, m_CPUUkemi);
-    char pad[0xC4E0];
+    FIELD(0xB68, CAtkParamEx, m_AtkParamNH);
+    FIELD(0xC2C, CAtkParamEx, m_AtkParamCH);
+    FIELD(0xD10, CAtkParam, m_DmgParam);
+    FIELD(0x1128, CAtkParamEx, m_DmgParamEx);
+    FIELD(0x11F8, int, m_bIsCounterHit);
+    FIELD(0x1208, int, m_MutekiDagekiTime);
+    ARRAY_FIELD(0x13f8, CInterruptInfo[106], m_InterruptInfo);
+    FIELD(0x3868, uint8_t*, m_TmpArgAddr);
+    FIELD(0x38D4, CActionRequestInfo, m_ActionRequestInfoReg);
+    FIELD(0x3910, OBJ_CCharBase*, m_pControlObject);
+    FIELD(0x62F8, unsigned int, m_PlayerFlag2);
+    FIELD(0x630C, unsigned int, m_CtrlDir);
+    FIELD(0x6310, unsigned int, m_EnableFlag);
+    FIELD(0x6314, unsigned int, m_Enable2Flag);
+    FIELD(0x6330, unsigned int, m_GuardStopCount);
+    FIELD(0x9AF8, int, m_StunCount);
+    FIELD(0x9B30, int, ply_JumpSpeed);
+    FIELD(0x9B6C, int, ply_Kizetsu);
+    FIELD(0xC414, int, m_ComboCount);
+    FIELD(0xC43C, int, m_ComboTimeWithOutAnten);
+    FIELD(0xC494, bool, m_IsImperfectCombo);
+    FIELD(0xC496, bool, m_UkemiMiss);
+    FIELD(0xC4A8, int, m_KizetsuPoint);
+    FIELD(0xC4AC, int, m_KizetsuMax);
+    FIELD(0xC4B0, int, m_KizetsuTime);
+    FIELD(0xC4B4, int, m_KizetsuTimeMax);
+    FIELD(0xC4FC, ID_CMNACT, m_CurCmnActionID);
+    FIELD(0xCA20, int, m_ExKizetsu);
+    FIELD(0xCA40, int, m_DustHomingTime);
+    FIELD(0xCA44, int, m_DustHomingSubTime);
+    FIELD(0xCA8C, int, m_GuardBalance);
+    FIELD(0xF050, CAtkParam, m_AtkParamForGGThrowStack);
+    FIELD(0xF460, CAtkParamEx, m_AtkParamCHForGGThrowStack);
+    FIELD(0xF540, CAtkParamEx, m_AtkParamNHForGGThrowStack);
+    FIELD(0x10840, int, m_CPUUkemi);
+    char pad[0xc500];
     uint8_t m_InpFlag[2][333];
 
     bool IsInHitstun();
@@ -597,13 +605,20 @@ private:
     static inline SafetyHookInline SetDamageParam;
     static inline SafetyHookInline CalcAtkAirStunTime;
     static inline SafetyHookInline GetEnemyHitStopTime;
+    static inline SafetyHookInline IsObjectToObjectPushCollisionMatched;
+    static inline SafetyHookInline FuncCallBySwitchCaseTable;
+    static inline SafetyHookInline CheckHitType;
+    static inline SafetyHookInline ObjectInitializeOnActivate;
     static inline SafetyHookMid CmnActUkemi;
     static inline SafetyHookMid SetGuardBackSpeed_JG;
     static inline SafetyHookMid PlayerInitializeOnEasyReset;
     static inline SafetyHookMid HitCollision;
     static inline SafetyHookMid OnFrameStepForPlayer;
+    static inline SafetyHookMid GetOperandValue;
+    static inline SafetyHookMid Tension_Add_Damage;
     static inline UREDGameCommon* GameCommon;
     static inline uintptr_t DBMTable;
+    static inline uintptr_t RiscScalingArray;
     static inline uintptr_t CmnActUkemi_HookAddr;
     static inline uintptr_t PlayerInitializeOnEasyReset_HookAddr;
     static inline Function<bool(OBJ_CCharBase*, int, int)> IsTrgBtnX;
@@ -645,6 +660,23 @@ public:
         patch_exe_bytes(DBMTable + 174 * 4, (PBYTE)&InstantBlockXPushback, 4);
         patch_exe_bytes(DBMTable + 178 * 4, (PBYTE)&InstantBlockXAirPushback, 4);
         patch_exe_bytes(DBMTable + 176 * 4, (PBYTE)&InstantBlockWindow, 4);
+        
+        // Data modification
+        uint32_t OldRiscScalingArray[] = {
+            256,
+            200,
+            152,
+            112,
+            80,
+            48,
+            32,
+            16,
+            8,
+            8,
+            8,
+        };
+
+        patch_exe_bytes(RiscScalingArray, reinterpret_cast<PBYTE>(OldRiscScalingArray), 4 * 11);
     }
 
     auto on_update() -> void override
@@ -660,16 +692,12 @@ public:
 
         GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].bEnable = true;
         GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].bCPU = true;
-        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].CharaID = 1;
-        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].bEnable = true;
-        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].bCPU = true;
-        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].CharaID = 2;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].CharaID = 0;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].ColorID = 2;
         GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].bEnable = true;
         GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].bCPU = true;
-        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].CharaID = 4;
-        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[2].bEnable = true;
-        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[2].bCPU = true;
-        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[2].CharaID = 5;
+        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].CharaID = 0;
+        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].ColorID = 3;
 
         GetSpawnPlayerInfoList.call(SpawnPlayerInfoList, pEasyCharaSelect);
     }
@@ -694,7 +722,7 @@ public:
             ukemi_direction = -1;
         }
 
-        if (GetPosX(ctx) > GetPosX(ctx->m_TargetObj))
+        if (GetPosX(ctx) > GetPosX(ctx->m_pTargetObj))
         {
             ukemi_direction *= -1;
         }
@@ -978,6 +1006,51 @@ public:
         }
     }
 
+    static bool is_object_to_object_push_collision_matched(OBJ_CCharBase* ctx, OBJ_CCharBase* tgt)
+    {
+        if ((ctx->m_CollisionFlag3 & 0x80000000) != (tgt->m_CollisionFlag3 & 0x80000000)) return false;
+
+        return IsObjectToObjectPushCollisionMatched.call<bool>(ctx, tgt);
+    }
+
+    static int func_call_by_switch_case_table(OBJ_CCharBase* ctx, uint8* addr)
+    {
+        uint32 id = *reinterpret_cast<uint32*>(addr);
+
+        if (id == 2518)
+        {
+            ctx->m_TmpArgAddr = addr;
+            addr += sizeof(uint32);
+
+            auto p = ctx;
+            
+            if (ctx->m_pControlObject)
+                p = ctx->m_pControlObject;
+
+            if (*reinterpret_cast<int32*>(addr) == 1) p->m_CollisionFlag3 |= 0x80000000;
+            else if (*reinterpret_cast<int32*>(addr) == 2) p->m_CollisionFlag3 &= ~0x80000000;
+            else p->m_CollisionFlag3 ^= 0x80000000;
+
+            return 0;
+        }
+
+        return FuncCallBySwitchCaseTable.call<uint8>(ctx, addr);
+    }
+
+    static int check_hit_type(OBJ_CCharBase* ctx, OBJ_CCharBase* dmObj, bool isSpGuardCollision, uint32* outHitTypeFlag, int32* outDamageReduce)
+    {
+        auto ret = CheckHitType.call<int>(ctx, dmObj, isSpGuardCollision, outHitTypeFlag, outDamageReduce);
+        if ((ctx->m_CollisionFlag3 & 0x80000000) != (dmObj->m_CollisionFlag3 & 0x80000000)) return 0;
+        return ret;
+    }
+
+    static int object_initialize_on_activate(OBJ_CCharBase* ctx, void* pArg)
+    {
+        auto ret = ObjectInitializeOnActivate.call<int>(ctx, pArg);
+        ctx->m_CollisionFlag3 |= ctx->m_pParentPly->m_CollisionFlag3 & 0x80000000;
+        return ret;
+    }
+    
     auto on_unreal_init() -> void override
     {
         const SignatureContainer dbm_table_sig{
@@ -1267,7 +1340,7 @@ public:
             },
             [&](const SignatureContainer& self)
             {
-                // GetSpawnPlayerInfoList = safetyhook::create_inline(self.get_match_address(), get_spawn_player_info_list);
+                GetSpawnPlayerInfoList = safetyhook::create_inline(self.get_match_address(), get_spawn_player_info_list);
                 return true;
             },
             [](SignatureContainer& self)
@@ -1344,6 +1417,142 @@ public:
             [&](const SignatureContainer& self)
             {
                 GetEnemyHitStopTime = safetyhook::create_inline(self.get_match_address(), get_enemy_hit_stop_time);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        // Damage Scaling Mod
+        const SignatureContainer risc_scaling_sig{
+            {{.signature = "4C 8D 0D ? ? ? ? BA FF FF FF FF"}},
+            [&](const SignatureContainer& self)
+            {
+                RiscScalingArray = *reinterpret_cast<int*>(self.get_match_address() + 0x3) + (uintptr_t)self.get_match_address() + 7;
+
+                // Data modification
+                uint32_t NewRiscScalingArray[] = {
+                    256,
+                    230,
+                    200,
+                    170,
+                    140,
+                    110,
+                    80,
+                    50,
+                    20,
+                    12,
+                    8,
+                };
+
+                patch_exe_bytes(RiscScalingArray, reinterpret_cast<PBYTE>(NewRiscScalingArray), 4 * 11);
+                
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+        
+        const SignatureContainer tension_add_damage_sig{
+            {
+                {
+                    .signature =
+                    "48 8B CE E8 ? ? ? ? 8D 47 ? 8D 1C 80"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                Tension_Add_Damage = safetyhook::create_mid(self.get_match_address(), [](SafetyHookContext& ctx)
+                {
+                    ctx.rdx /= 2;
+                });
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+        
+        // Isuka Mod
+        const SignatureContainer is_object_to_object_push_collision_matched_sig{
+            {
+                {
+                    .signature = "48 83 EC 28 44 0F B6 49 ? 44 0F B6 52"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                IsObjectToObjectPushCollisionMatched = safetyhook::create_inline(
+                    self.get_match_address(), is_object_to_object_push_collision_matched);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+        
+        const SignatureContainer func_call_by_switch_case_table_sig{
+            {
+                {
+                    .signature = "40 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC A0 0A 00 00"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                FuncCallBySwitchCaseTable = safetyhook::create_inline(self.get_match_address(), func_call_by_switch_case_table);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        const SignatureContainer check_hit_type_sig{
+            {
+                {
+                    .signature = "48 89 6C 24 ? 48 89 74 24 ? 57 41 54 41 55 41 56 41 57 48 83 EC 20 33 C0 4C 8B F2"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                CheckHitType = safetyhook::create_inline(self.get_match_address(), check_hit_type);
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+        
+        const SignatureContainer get_operand_value_sig{
+            {
+                {
+                    .signature = "0F B6 85 ? ? ? ? E9 ? ? ? ? 0F B6 85 ? ? ? ? E9"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                GetOperandValue = safetyhook::create_mid(self.get_match_address() + 7, [](SafetyHookContext& ctx)
+                {
+                    ctx.rax = ((OBJ_CCharBase*)ctx.rbp)->m_CollisionFlag3 & 0x80000000;
+                });
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+        
+        const SignatureContainer object_initialize_on_activate_sig{
+            {
+                {
+                    .signature = "40 53 55 56 57 41 54 41 56 41 57 48 83 EC 30 48 8B 05"
+                }
+            },
+            [&](const SignatureContainer& self)
+            {
+                ObjectInitializeOnActivate = safetyhook::create_inline(self.get_match_address(), object_initialize_on_activate);
                 return true;
             },
             [](SignatureContainer& self)
@@ -1534,12 +1743,15 @@ public:
         };
 
         std::vector<SignatureContainer> signature_containers;
+        // main
+
+#ifdef RIOT
         signature_containers.push_back(dbm_table_sig);
         signature_containers.push_back(ukemi_check_sig);
         signature_containers.push_back(cmn_act_ukemi_sig);
         // signature_containers.push_back(execute_damage_sig);
         signature_containers.push_back(on_frame_step_sig);
-        signature_containers.push_back(risc_counter_sig);
+        // signature_containers.push_back(risc_counter_sig);
         signature_containers.push_back(get_air_stun_time_sig);
         signature_containers.push_back(get_enemy_hit_stop_time_sig);
         signature_containers.push_back(set_damage_param_sig);
@@ -1547,6 +1759,8 @@ public:
         signature_containers.push_back(set_guard_back_speed_jg_sig);
         // signature_containers.push_back(hit_collision_sig);
         // signature_containers.push_back(on_frame_step_for_player_sig);
+        signature_containers.push_back(risc_scaling_sig);
+        signature_containers.push_back(tension_add_damage_sig);
         signature_containers.push_back(is_trg_btn_x_sig);
         signature_containers.push_back(training_menu_sig);
         signature_containers.push_back(is_training_dummy_sig);
@@ -1558,9 +1772,19 @@ public:
         signature_containers.push_back(get_cur_skill_sig);
         signature_containers.push_back(get_pos_x_sig);
         signature_containers.push_back(dir_sign_sig);
-        // signature_containers.push_back(multiple_characters_sig);
-        // signature_containers.push_back(multiple_characters_2_sig);
-
+#endif
+        
+        // isuka
+#ifdef ISUKA
+        signature_containers.push_back(is_object_to_object_push_collision_matched_sig);
+        signature_containers.push_back(func_call_by_switch_case_table_sig);
+        signature_containers.push_back(check_hit_type_sig);
+        signature_containers.push_back(get_operand_value_sig);
+        signature_containers.push_back(object_initialize_on_activate_sig);
+        signature_containers.push_back(multiple_characters_sig);
+        signature_containers.push_back(multiple_characters_2_sig);
+#endif
+        
         SinglePassScanner::SignatureContainerMap signature_containers_map;
         signature_containers_map.emplace(ScanTarget::MainExe, signature_containers);
 
