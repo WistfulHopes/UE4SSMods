@@ -35,7 +35,7 @@ void InitImGui()
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags = ImGuiConfigFlags_NoMouseCursorChange;
 
-        ImGuiStyle& style = ImGui::GetStyle();
+    ImGuiStyle& style = ImGui::GetStyle();
     io.IniFilename = nullptr;
     io.LogFilename = nullptr;
 
@@ -155,6 +155,8 @@ HRESULT __stdcall ResizeBuffersHook(
     UINT SwapChainFlags
 )
 {
+    if (!pContext) return ResizeBuffersOrig(pSwapChain, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+    pContext->OMSetRenderTargets(0, 0, 0);
     if (mainRenderTargetView)
     {
         mainRenderTargetView->Release();
@@ -165,6 +167,17 @@ HRESULT __stdcall ResizeBuffersHook(
     pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)& pBackBuffer);
     pDevice->CreateRenderTargetView(pBackBuffer, NULL, &mainRenderTargetView);
     pBackBuffer->Release();
+    pContext->OMSetRenderTargets(1, &mainRenderTargetView, NULL);
+    
+    D3D11_VIEWPORT vp;
+    vp.Width = Width;
+    vp.Height = Height;
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+    vp.TopLeftX = 0;
+    vp.TopLeftY = 0;
+    pContext->RSSetViewports( 1, &vp );
+    
     return ret;
 }
 

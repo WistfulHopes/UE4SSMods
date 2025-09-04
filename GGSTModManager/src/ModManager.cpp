@@ -206,6 +206,8 @@ namespace RC::GUI::ModManager
                 }
 
                 ImGui::Separator();
+
+                ImGui::PopID();
             }
 
             if (ImGui::Button("Change Mod Folder"))
@@ -286,6 +288,8 @@ namespace RC::GUI::ModManager
                     ImGui::CloseCurrentPopup();
                 }
             }
+
+            ImGui::EndPopup();
         }
     }
 
@@ -391,6 +395,7 @@ namespace RC::GUI::ModManager
                                 case 3:
                                     OnUnmountPak = *(DelegateUnmount**)ptr;
                                     self.get_did_succeed() = true;
+                                    load_mods();
                                     return true;
                                 default:
                                     break;
@@ -438,7 +443,7 @@ namespace RC::GUI::ModManager
 
     auto ModManager::load_mods() -> void
     {
-        if (!std::filesystem::exists(m_config.m_mods_folder))
+        if (std::error_code ec; !std::filesystem::exists(m_config.m_mods_folder, ec))
         {
             m_config.m_mods_folder = "";
         }
