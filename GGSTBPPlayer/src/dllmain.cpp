@@ -20,7 +20,7 @@ namespace GGSTMods
 {
     using namespace RC;
     using namespace Unreal;
-    
+
     enum SIDE_ID : int32
     {
         SIDE_BEGIN = 0x0,
@@ -31,7 +31,7 @@ namespace GGSTMods
         SIDE_ID_NUM_WITH_COMMON = 0x3,
         SIDE_ID_INVALID = 0x4,
     };
-    
+
     enum EMemberID : int32
     {
         MemberID_Begin = 0x0,
@@ -40,14 +40,14 @@ namespace GGSTMods
         MemberID_03 = 0x2,
         MemberID_MAX = 0x3,
         MemberID_INVALID = 0x4,
-      };
+    };
 
     struct IDConvertTable
     {
         int SourceID;
         int DestID;
     };
-    
+
     enum EBattleScript : int32
     {
         BATTLE_SCRIPT_DEFAULT = 0x0,
@@ -69,13 +69,13 @@ namespace GGSTMods
         int ColorID;
         EBattleScript ScriptType;
         FString VoiceLoc;
-        bool bREV2ModelFlag;
-        const IDConvertTable *CostumeIDConvTable;
-        const IDConvertTable *ColorIDConvTable;
+        bool bMayaTestFlag;
+        const IDConvertTable* CostumeIDConvTable;
+        const IDConvertTable* ColorIDConvTable;
         int CostumeIDConvTableNum;
         int ColorIDConvTableNum;
     };
-    
+
     struct FREDBattleVoiceCueInfo
     {
         bool bEnable;
@@ -83,14 +83,22 @@ namespace GGSTMods
         TArray<UObject*> VsCue;
     };
 
+    struct FBPEffectData
+    {
+        FName Name;
+        UClass* PawnClass;
+        int MaxNum;
+    };
+
     /**
     * GGSTBPPlayer: UE4SS c++ mod class defintion
     */
-    class GGSTBPPlayer : public CppUserModBase
+    class GGSTUIRemake : public CppUserModBase
     {
     public:
         // constructor
-        GGSTBPPlayer() {
+        GGSTUIRemake()
+        {
             ModVersion = STR("0.1");
             ModName = STR("GGSTBPPlayer");
             ModAuthors = STR("UE4SS");
@@ -99,18 +107,24 @@ namespace GGSTMods
             // other than the one you're currently building with somehow.
             //ModIntendedSDKVersion = STR("2.6");
         }
-        
-        static inline void(*AREDPawnPlayer_AllocInstance)(AActor*);
-        static inline void(*UREDCharaDarkAreaTableManager_SetTableData)(UObject*, UObject*);
-        static inline void(*AREDPawnPlayer_InitReservedEffectPawns)(AActor*, int);
-        static inline void(*UREDSoundPlayer_InitializeBattleVoice)(UObject*, unsigned int);
-        static inline void(*AREDPawn_SetupMesh)(AActor*, UObject*, UObject*, UObject*, UObject*, TArray<UObject*>, UObject*, TArray<UObject*>);
-        static inline void(*AREDPawn_SetupPTCColorAndMaterial)(AActor*, UObject*, UObject*);
-        static inline void(*AREDPawn_SetBoundsScale)(AActor*, float);
-        static inline void(*AREDPawn_SetupLinkBone)(AActor*);
 
-        PLH::x64Detour* ChangeAnime_Detour {};
-        static inline bool(*ChangeAnime_Orig)(AActor*, FName, bool, float, float);
+        static inline void (*AREDPawnPlayer_AllocInstance)(AActor*);
+        static inline void (*UREDCharaDarkAreaTableManager_SetTableData)(UObject*, UObject*);
+        static inline void (*AREDPawnPlayer_InitReservedEffectPawns)(AActor*, int);
+        static inline void (*UREDSoundPlayer_InitializeBattleVoice)(UObject*, unsigned int);
+        static inline void (*AREDPawn_SetupMesh)(AActor*, UObject*, UObject*, UObject*, UObject*, TArray<UObject*>,
+                                                 UObject*, TArray<UObject*>);
+        static inline void (*AREDPawn_SetupPTCColorAndMaterial)(AActor*, UObject*, UObject*);
+        static inline void (*AREDPawn_SetBoundsScale)(AActor*, float);
+        static inline void (*AREDPawn_SetupLinkBone)(AActor*);
+        static inline void (*AREDPawn_InitBPPawns)(AActor*);
+        static inline void (*UGameAssetLoader_AddPackageName)(TArray<FString>&, const FString&);
+        static inline UObject* (*UGameAssetLoader_LoadAssets)(UObject*, TArray<FString>&, bool);
+        static inline void (*UREDBPPawnPool_AddBP)(UObject*, AActor*, FName, UClass*, int);
+
+        PLH::x64Detour* ChangeAnime_Detour{};
+        static inline bool (*ChangeAnime_Orig)(AActor*, FName, bool, float, float);
+
         static bool ChangeAnime_Hook(AActor* pThis, FName Name, bool isLoop, float StartTime, float BlendTime)
         {
             if (const auto Function = pThis->GetFunctionByNameInChain(STR("SetFlipbook")))
@@ -126,9 +140,10 @@ namespace GGSTMods
             }
             return ChangeAnime_Orig(pThis, Name, isLoop, StartTime, BlendTime);
         }
-        
-        PLH::x64Detour* SetAnimeFrame_Detour {};
-        static inline void(*SetAnimeFrame_Orig)(AActor*, int);
+
+        PLH::x64Detour* SetAnimeFrame_Detour{};
+        static inline void (*SetAnimeFrame_Orig)(AActor*, int);
+
         static void SetAnimeFrame_Hook(AActor* pThis, int frame)
         {
             if (const auto Function = pThis->GetFunctionByNameInChain(STR("SetFrame")))
@@ -143,16 +158,21 @@ namespace GGSTMods
             }
             return SetAnimeFrame_Orig(pThis, frame);
         }
-        
-        PLH::x64Detour* SpawnPlayer_Detour {};
+
+        PLH::x64Detour* SpawnPlayer_Detour{};
         static inline AActor*(*SpawnPlayer_Orig)(AActor*, const FSpawnPlayerInfo*);
+
         static AActor* SpawnPlayer_Hook(AActor* pGameState, const FSpawnPlayerInfo* info)
         {
-            const auto AssetName = FName(std::format(STR("/Game/Chara/{}/Costume{:02}/CharaBP.CharaBP_C"), *((TArray<TCHAR>*)&info->CharaID)->GetData(), info->CostumeID + 1), FNAME_Add);
-            auto AssetData = FAssetData();
-            AssetData.SetObjectPath(AssetName);
-            const auto Asset = UAssetRegistryHelpers::GetAsset(AssetData);
+            TArray<FString> Paths;
+            const auto AssetName =
+                std::format(
+                    STR("/Game/Chara/{}/Costume{:02}/CharaBP.CharaBP_C"), info->CharaID.GetCharArray(),
+                    info->CostumeID + 1);
+            UGameAssetLoader_AddPackageName(Paths, FString(AssetName.c_str()));
+            UGameAssetLoader_LoadAssets(pGameState, Paths, true);
 
+            const auto Asset = UObjectGlobals::FindObject(nullptr, nullptr, AssetName);
             if (!Asset) return SpawnPlayer_Orig(pGameState, info);
 
             const auto Player = pGameState->GetWorld()->SpawnActor(reinterpret_cast<UClass*>(Asset), nullptr, nullptr);
@@ -160,39 +180,51 @@ namespace GGSTMods
 
             if (Player->GetPropertyByNameInChain(STR("Colors")))
             {
-                const auto Colors = *Player->GetPropertyByNameInChain(STR("Colors"))->ContainerPtrToValuePtr<TArray<UObject*>>(Player);
+                const auto Colors = *Player->GetPropertyByNameInChain(STR("Colors"))->ContainerPtrToValuePtr<TArray<
+                    UObject*>>(Player);
                 if (Colors.Num() > info->ColorID)
                 {
-                    *Player->GetPropertyByNameInChain(STR("PawnMaterials"))->ContainerPtrToValuePtr<UObject*>(Player) = Colors[info->ColorID];
+                    *Player->GetPropertyByNameInChain(STR("PawnMaterials"))->ContainerPtrToValuePtr<UObject*>(Player) =
+                        Colors[info->ColorID];
                 }
             }
             if (Player->GetPropertyByNameInChain(STR("PTC")))
             {
-                const auto PTC = *Player->GetPropertyByNameInChain(STR("PTC"))->ContainerPtrToValuePtr<TArray<UObject*>>(Player);
+                const auto PTC = *Player->GetPropertyByNameInChain(STR("PTC"))->ContainerPtrToValuePtr<TArray<UObject
+                    *>>(Player);
                 if (PTC.Num() > info->ColorID)
                 {
-                    *Player->GetPropertyByNameInChain(STR("PTCColorAndMaterial"))->ContainerPtrToValuePtr<UObject*>(Player) = PTC[info->ColorID];
+                    *Player->GetPropertyByNameInChain(STR("PTCColorAndMaterial"))->ContainerPtrToValuePtr<UObject
+                        *>(Player) = PTC[info->ColorID];
                 }
             }
-            
+
             AREDPawnPlayer_AllocInstance(Player);
-            
-            if (const auto DarkAreaTableManagerClass = reinterpret_cast<UClass*>(UObjectGlobals::StaticFindObject(nullptr, nullptr,
+
+            if (const auto DarkAreaTableManagerClass = reinterpret_cast<UClass*>(UObjectGlobals::StaticFindObject(
+                nullptr, nullptr,
                 STR("/Script/RED.REDCharaDarkAreaTableManager"))))
             {
                 const auto Params = FStaticConstructObjectParameters(DarkAreaTableManagerClass, Player);
                 const auto DarkAreaTableManager = UObjectGlobals::StaticConstructObject(Params);
-                *Player->GetPropertyByNameInChain(STR("DarkAreaSetting"))->ContainerPtrToValuePtr<UObject*>(Player) = DarkAreaTableManager;
-                UREDCharaDarkAreaTableManager_SetTableData(DarkAreaTableManager, *Player->GetPropertyByNameInChain(STR("DarkAreaTable"))->ContainerPtrToValuePtr<UObject*>(Player));
+                *Player->GetPropertyByNameInChain(STR("DarkAreaSetting"))->ContainerPtrToValuePtr<UObject*>(Player) =
+                    DarkAreaTableManager;
+                UREDCharaDarkAreaTableManager_SetTableData(DarkAreaTableManager,
+                                                           *Player->GetPropertyByNameInChain(STR("DarkAreaTable"))->
+                                                                    ContainerPtrToValuePtr<UObject*>(Player));
             }
             AREDPawnPlayer_InitReservedEffectPawns(Player, info->MemberID + 3 * info->SideID);
-            UREDSoundPlayer_InitializeBattleVoice(*Player->GetPropertyByNameInChain(STR("Voice"))->ContainerPtrToValuePtr<UObject*>(Player), 10);
-            
+            UREDSoundPlayer_InitializeBattleVoice(
+                *Player->GetPropertyByNameInChain(STR("Voice"))->ContainerPtrToValuePtr<UObject*>(Player), 10);
+
             if (Player->GetPropertyByNameInChain(STR("VoiceCues")))
             {
-                const auto Voice = *Player->GetPropertyByNameInChain(STR("Voice"))->ContainerPtrToValuePtr<UObject*>(Player);
-                const auto BattleVoice = Voice->GetPropertyByNameInChain(STR("BattleVoice"))->ContainerPtrToValuePtr<TArray<FREDBattleVoiceCueInfo>>(Voice);
-                auto VoiceCues = *Player->GetPropertyByNameInChain(STR("VoiceCues"))->ContainerPtrToValuePtr<TArray<UObject*>>(Player);
+                const auto Voice = *Player->GetPropertyByNameInChain(STR("Voice"))->ContainerPtrToValuePtr<UObject
+                    *>(Player);
+                const auto BattleVoice = Voice->GetPropertyByNameInChain(STR("BattleVoice"))->ContainerPtrToValuePtr<
+                    TArray<FREDBattleVoiceCueInfo>>(Voice);
+                auto VoiceCues = *Player->GetPropertyByNameInChain(STR("VoiceCues"))->ContainerPtrToValuePtr<TArray<
+                    UObject*>>(Player);
                 for (int i = 0; i < 10; i++)
                 {
                     if (i >= VoiceCues.Num()) break;
@@ -205,35 +237,64 @@ namespace GGSTMods
             }
             if (Player->GetPropertyByNameInChain(STR("PrivateSECues")))
             {
-                const auto PrivateSE = *Player->GetPropertyByNameInChain(STR("PrivateSE"))->ContainerPtrToValuePtr<UObject*>(Player);
-                *PrivateSE->GetPropertyByNameInChain(STR("Cues"))->ContainerPtrToValuePtr<UObject*>(PrivateSE) 
+                const auto PrivateSE = *Player->GetPropertyByNameInChain(STR("PrivateSE"))->ContainerPtrToValuePtr<
+                    UObject*>(Player);
+                *PrivateSE->GetPropertyByNameInChain(STR("Cues"))->ContainerPtrToValuePtr<UObject*>(PrivateSE)
                     = *Player->GetPropertyByNameInChain(STR("PrivateSECues"))->ContainerPtrToValuePtr<UObject*>(Player);
             }
-            
+
             AREDPawn_SetupMesh(Player,
-                *pGameState->GetPropertyByNameInChain(STR("MaterialInstancePool"))->ContainerPtrToValuePtr<UObject*>(pGameState),
-                *Player->GetPropertyByNameInChain(STR("MeshArray"))->ContainerPtrToValuePtr<UObject*>(Player),
-                *Player->GetPropertyByNameInChain(STR("AnimArray"))->ContainerPtrToValuePtr<UObject*>(Player),
-                *Player->GetPropertyByNameInChain(STR("PawnMaterials"))->ContainerPtrToValuePtr<UObject*>(Player),
-                *Player->GetPropertyByNameInChain(STR("VSAnimArrayList"))->ContainerPtrToValuePtr<TArray<UObject*>>(Player),
-                *Player->GetPropertyByNameInChain(STR("HandAnimArray"))->ContainerPtrToValuePtr<UObject*>(Player),
-                TArray<UObject*>());
-            
-            const auto REDPTCMaterialAppendDataClass = reinterpret_cast<UClass*>(UObjectGlobals::StaticFindObject(nullptr, nullptr,
+                               *pGameState->GetPropertyByNameInChain(STR("MaterialInstancePool"))->
+                                            ContainerPtrToValuePtr<UObject*>(pGameState),
+                               *Player->GetPropertyByNameInChain(STR("MeshArray"))->ContainerPtrToValuePtr<UObject*>(
+                                   Player),
+                               *Player->GetPropertyByNameInChain(STR("AnimArray"))->ContainerPtrToValuePtr<UObject*>(
+                                   Player),
+                               *Player->GetPropertyByNameInChain(STR("PawnMaterials"))->ContainerPtrToValuePtr<UObject
+                                   *>(Player),
+                               *Player->GetPropertyByNameInChain(STR("VSAnimArrayList"))->ContainerPtrToValuePtr<TArray<
+                                   UObject*>>(Player),
+                               *Player->GetPropertyByNameInChain(STR("HandAnimArray"))->ContainerPtrToValuePtr<UObject
+                                   *>(Player),
+                               TArray<UObject*>());
+
+            const auto REDPTCMaterialAppendDataClass = reinterpret_cast<UClass*>(UObjectGlobals::StaticFindObject(
+                nullptr, nullptr,
                 STR("/Script/RED.REDPTCMaterialAppendData")));
-            auto Append = UObjectGlobals::StaticFindObject(REDPTCMaterialAppendDataClass, reinterpret_cast<UObject*>(-1), STR("/Game/Common/CMN/Common/Effect/Particles/AppendMaterialData.AppendMaterialData"));
-            AREDPawn_SetupPTCColorAndMaterial(Player, *Player->GetPropertyByNameInChain(STR("PTCColorAndMaterial"))->ContainerPtrToValuePtr<UObject*>(Player), Append);
+            auto Append = UObjectGlobals::StaticFindObject(REDPTCMaterialAppendDataClass,
+                                                           reinterpret_cast<UObject*>(-1),
+                                                           STR(
+                                                               "/Game/Common/CMN/Common/Effect/Particles/AppendMaterialData.AppendMaterialData"));
+            AREDPawn_SetupPTCColorAndMaterial(
+                Player,
+                *Player->GetPropertyByNameInChain(STR("PTCColorAndMaterial"))->ContainerPtrToValuePtr<UObject*>(Player),
+                Append);
             AREDPawn_SetBoundsScale(Player, 40000.0);
             AREDPawn_SetupLinkBone(Player);
-            
+
+            auto EffectData = *Player->GetPropertyByNameInChain(STR("EffectData"))->ContainerPtrToValuePtr<UObject*>(
+                                   Player);
+            auto BPPawnPool = *Player->GetPropertyByNameInChain(STR("BPPawnPool"))->ContainerPtrToValuePtr<UObject*>(
+                                   Player);
+
+            if (EffectData)
+            {
+                auto BPEffectData = *EffectData->GetPropertyByNameInChain(STR("BPEffectData"))->ContainerPtrToValuePtr<TArray<FBPEffectData>>(EffectData);
+                for (auto& bp : BPEffectData)
+                {
+                    UREDBPPawnPool_AddBP(BPPawnPool, pGameState, bp.Name, bp.PawnClass, bp.MaxNum);
+                }
+            }
+
             return Player;
         }
 
         // destructor
-        ~GGSTBPPlayer() override {
+        ~GGSTUIRemake() override
+        {
             // fill when required
         }
-        
+
         auto on_program_start() -> void override
         {
         }
@@ -241,129 +302,187 @@ namespace GGSTMods
         auto on_dll_load(std::wstring_view dll_name) -> void override
         {
         }
-        
+
         auto on_unreal_init() -> void override
         {
             const SignatureContainer alloc_instance{
-                {{"48 89 5C 24 10 57 48 83 EC 50 48 8D 15 ? ? ? ? 48 8B D9 E8 ? ? ? ? 33 FF 48 89 7C 24 60 E8 ? ? ? ? 40 88 7C 24 40 45 33 C9 48 89 7C 24 38 44 8B C7 40 88 7C 24 30 48 8B D3 48 89 7C 24 28 48 8B C8 89 7C 24 20 E8 ? ? ? ? 41 B0 01"}},
-                    [&](const SignatureContainer & self) {
-                        AREDPawnPlayer_AllocInstance = reinterpret_cast<void(*)(AActor*)>(self.get_match_address());
-                        return true;
+                {
+                    {
+                        "48 89 5C 24 10 57 48 83 EC 50 48 8D 15 ? ? ? ? 48 8B D9 E8 ? ? ? ? 33 FF 48 89 7C 24 60 E8 ? ? ? ? 40 88 7C 24 40 45 33 C9 48 89 7C 24 38 44 8B C7 40 88 7C 24 30 48 8B D3 48 89 7C 24 28 48 8B C8 89 7C 24 20 E8 ? ? ? ? 41 B0 01"
+                    }
                 },
-                [](SignatureContainer & self)
+                [&](const SignatureContainer& self)
+                {
+                    AREDPawnPlayer_AllocInstance = reinterpret_cast<void(*)(AActor*)>(self.get_match_address());
+                    return true;
+                },
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer set_table_data{
                 {{"40 53 55 57 41 54 41 55 41 56 41 57 48 81 EC F0 00 00 00"}},
-                    [&](const SignatureContainer & self) {
-                        UREDCharaDarkAreaTableManager_SetTableData = reinterpret_cast<void(*)(UObject*, UObject*)>(self.get_match_address());
-                        return true;
+                [&](const SignatureContainer& self)
+                {
+                    UREDCharaDarkAreaTableManager_SetTableData = reinterpret_cast<void(*)(UObject*, UObject*)>(self.
+                        get_match_address());
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer init_reserved_effect_pawns{
-                {{"40 56 48 83 EC 40 89 91 88 9C 02 00"}},
-                    [&](const SignatureContainer & self) {
-                        AREDPawnPlayer_InitReservedEffectPawns = reinterpret_cast<void(*)(AActor*, int)>(self.get_match_address());
-                        return true;
+                {{"40 56 48 83 EC ? 89 91"}},
+                [&](const SignatureContainer& self)
+                {
+                    AREDPawnPlayer_InitReservedEffectPawns = reinterpret_cast<void(*)(AActor*, int)>(self.
+                        get_match_address());
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer init_battle_voice{
-                {{"48 8B C4 41 56 48 83 EC 60 48 89 58 08"}},
-                    [&](const SignatureContainer & self) {
-                        UREDSoundPlayer_InitializeBattleVoice = reinterpret_cast<void(*)(UObject*, unsigned int)>(self.get_match_address());
-                        return true;
+                {{"48 8B C4 41 56 48 83 EC ? 48 89 58 ? 48 89 68 ? 48 8B E9 48 89 70"}},
+                [&](const SignatureContainer& self)
+                {
+                    UREDSoundPlayer_InitializeBattleVoice = reinterpret_cast<void(*)(UObject*, unsigned int)>(self.
+                        get_match_address());
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer setup_mesh{
                 {{"4C 89 44 24 18 55 53 57 41 55 41 57 48 8D 6C 24 C9 48 81 EC 90 00 00 00"}},
-                    [&](const SignatureContainer & self) {
-                        AREDPawn_SetupPTCColorAndMaterial = reinterpret_cast<void(*)(AActor*, UObject*, UObject*)>(self.get_match_address());
-                        return true;
+                [&](const SignatureContainer& self)
+                {
+                    AREDPawn_SetupPTCColorAndMaterial = reinterpret_cast<void(*)(AActor*, UObject*, UObject*)>(self.
+                        get_match_address());
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer setup_ptc{
                 {{"4D 85 C0 0F 84 ? ? ? ? 4C 8B DC 41 57"}},
-                    [&](const SignatureContainer & self) {
-                        AREDPawn_SetupMesh = reinterpret_cast<void(*)(AActor*, UObject*, UObject*, UObject*, UObject*, TArray<UObject*>, UObject*, TArray<UObject*>)>(self.get_match_address());
-                        return true;
+                [&](const SignatureContainer& self)
+                {
+                    AREDPawn_SetupMesh = reinterpret_cast<void(*)(AActor*, UObject*, UObject*, UObject*, UObject*,
+                                                                  TArray<UObject*>, UObject*,
+                                                                  TArray<UObject*>)>(self.get_match_address());
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer set_bounds_scale{
                 {{"33 C0 39 81 08 92 02 00"}},
-                    [&](const SignatureContainer & self) {
-                        AREDPawn_SetBoundsScale = reinterpret_cast<void(*)(AActor*, float)>(self.get_match_address());
-                        return true;
+                [&](const SignatureContainer& self)
+                {
+                    AREDPawn_SetBoundsScale = reinterpret_cast<void(*)(AActor*, float)>(self.get_match_address());
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer setup_link_bone{
                 {{"41 54 41 55 41 57 48 83 EC 40 45 33 ED 4C 8B F9"}},
-                    [&](const SignatureContainer & self) {
-                        AREDPawn_SetupLinkBone = reinterpret_cast<void(*)(AActor*)>(self.get_match_address());
-                        return true;
+                [&](const SignatureContainer& self)
+                {
+                    AREDPawn_SetupLinkBone = reinterpret_cast<void(*)(AActor*)>(self.get_match_address());
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer spawn_player{
                 {{"48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 60 48 8B 01 48 8B FA 48 8B F1"}},
-                    [&](const SignatureContainer & self) {
-                        SpawnPlayer_Detour = new PLH::x64Detour(
-                            reinterpret_cast<uint64_t>(self.get_match_address()), reinterpret_cast<uint64_t>(&SpawnPlayer_Hook),
-                            reinterpret_cast<uint64_t*>(&SpawnPlayer_Orig));
-                        SpawnPlayer_Detour->hook();
-                        return true;
+                [&](const SignatureContainer& self)
+                {
+                    SpawnPlayer_Detour = new PLH::x64Detour(
+                        reinterpret_cast<uint64_t>(self.get_match_address()),
+                        reinterpret_cast<uint64_t>(&SpawnPlayer_Hook),
+                        reinterpret_cast<uint64_t*>(&SpawnPlayer_Orig));
+                    SpawnPlayer_Detour->hook();
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer change_anime{
                 {{"48 8B C4 53 56 41 56 48 83 EC 60"}},
-                    [&](const SignatureContainer & self) {
-                        ChangeAnime_Detour = new PLH::x64Detour(
-                            reinterpret_cast<uint64_t>(self.get_match_address()), reinterpret_cast<uint64_t>(&ChangeAnime_Hook),
-                            reinterpret_cast<uint64_t*>(&ChangeAnime_Orig));
-                        ChangeAnime_Detour->hook();
-                        return true;
+                [&](const SignatureContainer& self)
+                {
+                    ChangeAnime_Detour = new PLH::x64Detour(
+                        reinterpret_cast<uint64_t>(self.get_match_address()),
+                        reinterpret_cast<uint64_t>(&ChangeAnime_Hook),
+                        reinterpret_cast<uint64_t*>(&ChangeAnime_Orig));
+                    ChangeAnime_Detour->hook();
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
             const SignatureContainer set_anime_frame{
                 {{"48 89 6C 24 18 48 89 74 24 20 41 56 48 83 EC 20 33 F6 44 8B F2"}},
-                    [&](const SignatureContainer & self) {
-                        SetAnimeFrame_Detour = new PLH::x64Detour(
-                            reinterpret_cast<uint64_t>(self.get_match_address()), reinterpret_cast<uint64_t>(&SetAnimeFrame_Hook),
-                            reinterpret_cast<uint64_t*>(&SetAnimeFrame_Orig));
-                        SetAnimeFrame_Detour->hook();
-                        return true;
+                [&](const SignatureContainer& self)
+                {
+                    SetAnimeFrame_Detour = new PLH::x64Detour(
+                        reinterpret_cast<uint64_t>(self.get_match_address()),
+                        reinterpret_cast<uint64_t>(&SetAnimeFrame_Hook),
+                        reinterpret_cast<uint64_t*>(&SetAnimeFrame_Orig));
+                    SetAnimeFrame_Detour->hook();
+                    return true;
                 },
-                [](SignatureContainer & self)
+                [](SignatureContainer& self)
                 {
                 },
             };
-            
+            const SignatureContainer add_package_name{
+                {{"40 53 48 83 EC ? 83 7A ? ? 48 8B D9 7E"}},
+                [&](const SignatureContainer& self)
+                {
+                    UGameAssetLoader_AddPackageName = reinterpret_cast<void(*)(
+                        TArray<FString>&, const FString&)>(self.get_match_address());
+                    return true;
+                },
+                [](SignatureContainer& self)
+                {
+                },
+            };
+            const SignatureContainer load_assets{
+                {{"48 8B C4 44 88 40 ? 55 48 81 EC"}},
+                [&](const SignatureContainer& self)
+                {
+                    UGameAssetLoader_LoadAssets = reinterpret_cast<UObject*(*)(UObject*, TArray<FString>&, bool)>(self.get_match_address());
+                    return true;
+                },
+                [](SignatureContainer& self)
+                {
+                },
+            };
+            const SignatureContainer add_bp{
+                {{"48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 41 54 41 55 41 56 41 57 48 83 EC ? 48 8B 02 4C 8B F9"}},
+                [&](const SignatureContainer& self)
+                {
+                    UREDBPPawnPool_AddBP = reinterpret_cast<void(*)(UObject*, AActor*, FName, UClass*, int)>(self.get_match_address());
+                    return true;
+                },
+                [](SignatureContainer& self)
+                {
+                },
+            };
+
             std::vector<SignatureContainer> signature_containers;
             signature_containers.push_back(alloc_instance);
             signature_containers.push_back(set_table_data);
@@ -376,21 +495,25 @@ namespace GGSTMods
             signature_containers.push_back(spawn_player);
             signature_containers.push_back(change_anime);
             signature_containers.push_back(set_anime_frame);
-      
+            signature_containers.push_back(add_package_name);
+            signature_containers.push_back(load_assets);
+            signature_containers.push_back(add_bp);
+
             SinglePassScanner::SignatureContainerMap signature_containers_map;
             signature_containers_map.emplace(ScanTarget::MainExe, signature_containers);
-            
+
             SinglePassScanner::start_scan(signature_containers_map);
         }
-    };//class
+    }; //class
 }
 
 /**
 * export the start_mod() and uninstall_mod() functions to
 * be used by the core ue4ss system to load in our dll mod
 */
-#define GGSTBPPLAYER_EXPORT __declspec(dllexport) 
+#define GGSTBPPLAYER_EXPORT __declspec(dllexport)
+
 extern "C" {
-    GGSTBPPLAYER_EXPORT CppUserModBase* start_mod(){ return new GGSTMods::GGSTBPPlayer(); }
-    GGSTBPPLAYER_EXPORT void uninstall_mod(CppUserModBase* mod) { delete mod; }
+GGSTBPPLAYER_EXPORT CppUserModBase* start_mod() { return new GGSTMods::GGSTUIRemake(); }
+GGSTBPPLAYER_EXPORT void uninstall_mod(CppUserModBase* mod) { delete mod; }
 }
