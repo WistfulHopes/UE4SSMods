@@ -598,7 +598,7 @@ class UeTracker
         orig_AHUDPostRender = (funcAHUDPostRender_t)vtable_hook(AHUD_vtable, 214, hook_AHUDPostRender);
 
         const auto** ACamera_vtable = (const void**)get_rip_relative(
-            sigscan::get().scan("\x48\x8D\x05\x00\x00\x00\x00\x48\x8d\x8f\x20\x28\x00\x00", "xxx????xxxxxxx") + 3);
+            sigscan::get().scan("\x48\x8D\x05\x00\x00\x00\x00\x48\x89\x07\x48\x8D\x8F\x00\x00\x00\x00\xC7\x87\x00\x00\x00\x00\xFF\xFF\xFF\xFF", "xxx????xxxxxx????xx????xxxx") + 3);
         orig_ACamUpdateCamera = (funcACamUpdateCamera_t)vtable_hook(ACamera_vtable, 208, hook_ACamUpdateCamera);
     }
 
@@ -778,14 +778,14 @@ void hook_UpdateBattleInput(asw_inputs* Analyzer, RECFLG_ENUM recFlag)
 
     // Value is from KeyConfig2GKF, the final if/else set, first function call
 
-    auto bak = *((uint8_t*)module + 0x4F39B73);
-    *((uint8_t*)module + 0x4F39B73) = 1;
+    auto bak = *((uint8_t*)module + 0x4fa4713);
+    *((uint8_t*)module + 0x4fa4713) = 1;
 
     auto pad = game_state.getMainQuadrant();
     auto gameKeyFlag = static_cast<GAMEKEY_FLAG>(system_red->m_BattleKey[pad]->m_PureKey);
     auto newRecflag = orig_GameKeyToRecFlag(pad, gameKeyFlag, false);
 
-    *((uint8_t*)module + 0x4F39B73) = bak;
+    *((uint8_t*)module + 0x4fa4713) = bak;
     orig_UpdateBattleInput(Analyzer, newRecflag);
 }
 
@@ -797,7 +797,8 @@ void hook_UpdateSystem(uintptr_t System)
 
 void hook_UpdateReplay(BattleReplayManager* Manager)
 {
-    orig_UpdateReplay(Manager);
+    if (replay_manager.isAnalyzerSame(nullptr))
+        orig_UpdateReplay(Manager);
 
     if (replay_manager.loadState)
     {

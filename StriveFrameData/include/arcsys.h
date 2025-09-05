@@ -20,11 +20,11 @@ public:
 
 class AREDGameState_Battle : public AGameState {
 public:
-  FIELD(0xC18, class asw_rollback*, Rollback);
-  FIELD(0xC30, class asw_engine*, Engine);
-  FIELD(0xC38, class asw_scene*, Scene);
-  FIELD(0xC48, class asw_state*, State);
-  FIELD(0xC50, class asw_events*, Events);
+  FIELD(0xC20, class asw_rollback*, Rollback);
+  FIELD(0xC38, class asw_engine*, Engine);
+  FIELD(0xC40, class asw_scene*, Scene);
+  FIELD(0xC50, class asw_state*, State);
+  FIELD(0xC58, class asw_events*, Events);
 };
 
 class asw_rollback
@@ -65,13 +65,13 @@ public:
 };
 
 class player_block {
-  char pad[0x190];
+  char pad[0x198];
 
 public:
   FIELD(0x8, class asw_player*, entity);
 };
 
-static_assert(sizeof(player_block) == 0x190);
+static_assert(sizeof(player_block) == 0x198);
 
 enum BOM_EVENT {
   BOM_EVENT_ENTRY = 0,
@@ -151,11 +151,10 @@ public:
   static asw_engine *get();
 
   ARRAY_FIELD(0x0, player_block[2], players);
-  FIELD(0x900, int, entity_count);
-  ARRAY_FIELD(0xC70, class asw_entity* [107], entities);
-  ARRAY_FIELD(0x1498, RC::Unreal::AActor* [7], pawns);
-  ARRAY_FIELD(0x3858, asw_inputs[6], inputs);
-  FIELD(0x3858, int, GameFrame);
+  FIELD(0x910, int, entity_count);
+  ARRAY_FIELD(0xC80, class asw_entity* [107], entities);
+  ARRAY_FIELD(0x3868, asw_inputs[6], inputs);
+  FIELD(0x3E7C, int, GameFrame);
 };
 
 class asw_scene {
@@ -215,7 +214,7 @@ public:
 static_assert(sizeof(event_handler) == 0x58);
 
 class atk_param {
-  char pad[0x3F8];
+  char pad[0x410];
 
 public:
   FIELD(0x0, int, atk_type);
@@ -245,10 +244,10 @@ public:
   FIELD(0x304, int, guard_crush_time);
 };
 
-static_assert(sizeof(atk_param) == 0x3F8);
+static_assert(sizeof(atk_param) == 0x410);
 
 class atk_param_ex {
-  char pad[0xBC];
+  char pad[0xC0];
 
 public:
   FIELD(0x0, int, air_pushback_x);
@@ -263,7 +262,7 @@ public:
   FIELD(0x48, int, atk_soft_knockdown);
 };
 
-static_assert(sizeof(atk_param_ex) == 0xBC);
+static_assert(sizeof(atk_param_ex) == 0xC0);
 
 class ActionReqInfo {
   char pad[0x50];
@@ -361,32 +360,32 @@ public:
   FIELD(0x798, int, activation_range_x_min);
   FIELD(0x79C, int, activation_range_y_min);
   FIELD(0x7A0, int, throw_range);
-  FIELD(0xB60, atk_param_ex, atk_param_ex_normal); // Outdated?
-  FIELD(0xC1C, atk_param_ex, atk_param_ex_counter); // Outdated?
-  FIELD(0xCF0, atk_param, atk_param_defend); // Outdated?
-  FIELD(0x10F0, atk_param_ex, atk_param_ex_defend); // Outdated?
-  FIELD(0x11EC, int, backdash_invuln);
+  FIELD(0xB68, atk_param_ex, atk_param_ex_normal); // Outdated?
+  FIELD(0xC2C, atk_param_ex, atk_param_ex_counter); // Outdated?
+  FIELD(0xD10, atk_param, atk_param_defend); // Outdated?
+  FIELD(0x1128, atk_param_ex, atk_param_ex_defend); // Outdated?
+  FIELD(0x1208, int, backdash_invuln);
   // bbscript
-  FIELD(0x1260, bbscript::event_bitmask, event_handler_bitmask);
-  FIELD(0x12A0, char*, bbs_file);
-  FIELD(0x12A8, char*, script_base);
-  FIELD(0x12B0, char*, next_script_cmd);
-  FIELD(0x12B8, char*, first_script_cmd);
+  FIELD(0x127C, bbscript::event_bitmask, event_handler_bitmask);
+  FIELD(0x12c0, char*, bbs_file);
+  FIELD(0x12c8, char*, script_base);
+  FIELD(0x12d0, char*, next_script_cmd);
+  FIELD(0x12d8, char*, first_script_cmd);
 
-  ARRAY_FIELD(0x12C0, char[32], sprite_name);
-  FIELD(0x12E0, int, sprite_duration);
-  FIELD(0x12E8, int, sprite_total_duration);
+  ARRAY_FIELD(0x12E0, char[32], sprite_name);
+  FIELD(0x1300, int, sprite_duration);
+  FIELD(0x1308, int, sprite_total_duration);
   //    FIELD(0x3740, int, sprite_changes);
   //    ARRAY_FIELD(0x13bc, event_handler[(size_t)bbscript::event_type::MAX], event_handlers);
   //    ARRAY_FIELD(0x37a4, char[20], state_name); // m_CurActionName (old: 0x3628, 0x118 offset)
 
   // m_ActionRequestInfo, Ghidra: 0x3674, 0x118 offset?)
   // Ghidra + 0x118 = 0x378C (from state_name)
-  FIELD(0x38BC, ActionReqInfo, action_info);
+  FIELD(0x38D4, ActionReqInfo, action_info);
 
   // m_ActionRequestInfo, Ghidra: 0x36c4, 0x118 offset?)
   // Ghidra + 0x118 = 0x37DC (from state_name)
-  FIELD(0x390C, ActionReqInfo, action_info_reg);
+  FIELD(0x3924, ActionReqInfo, action_info_reg);
 
   bool is_active() const;
   bool is_pushbox_active() const;
@@ -627,21 +626,21 @@ enum PLATTACK_FLAG {
 class asw_player : public asw_entity {
 
 public:
-  FIELD(0x62F0, int, enable_flag); // original: 0x6080 -> fixed: 0x60E0 (+0x060)
-  FIELD(0x62FC, int, attack_flag); // original: 0x5F90 -> fixed: 0x60EC (+0x060)
-  FIELD(0x6310, int, blockstun); // original: 0x60A0 + 0x060 = 0x6100
-  FIELD(0x9AD8, int, hitstun); // original: 0x9868 + 0x060 = 0x98C8
+  FIELD(0x6310, int, enable_flag); // original: 0x6080 -> fixed: 0x60E0 (+0x060)
+  FIELD(0x631C, int, attack_flag); // original: 0x5F90 -> fixed: 0x60EC (+0x060)
+  FIELD(0x6330, int, blockstun); // original: 0x60A0 + 0x060 = 0x6100
+  FIELD(0x9AF8, int, hitstun); // original: 0x9868 + 0x060 = 0x98C8
 
-  FIELD(0x9BA8, int, pushboxYUpperAir);
-  FIELD(0x9BAC, int, pushboxYLowerAir);
+  FIELD(0x9BC8, int, pushboxYUpperAir);
+  FIELD(0x9BCC, int, pushboxYLowerAir);
 
-  FIELD(0xC4DC, ID_CMNACT, cur_cmn_action_id); // original: 0xC26C + 0x060 = 0xC2CC
-  FIELD(0xD20C, int, slowdown_timer); // original: 0xCF9C + 0x060 = 0xCFFC
-  FIELD(0x10890, MoveDataCollection, move_datas);
+  FIELD(0xC4FC, ID_CMNACT, cur_cmn_action_id); // original: 0xC26C + 0x060 = 0xC2CC
+  FIELD(0xD22C, int, slowdown_timer); // original: 0xCF9C + 0x060 = 0xCFFC
+  FIELD(0x108B0, MoveDataCollection, move_datas);
 
-  FIELD(0x102E8, int, afro); // m_IsAfro Header: 0xed28, Offset: 0x508
-  FIELD(0x10230, int, afroW);
-  FIELD(0x10234, int, afroH);
+  FIELD(0x10328, int, afro); // m_IsAfro Header: 0xed28, Offset: 0x508
+  FIELD(0x10360, int, afroW);
+  FIELD(0x10364, int, afroH);
 
   int calc_advantage();
   bool is_in_hitstun() const;
