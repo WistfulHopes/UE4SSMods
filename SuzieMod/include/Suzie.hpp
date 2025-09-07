@@ -27,7 +27,7 @@ struct FDynamicProperty
 struct FDynamicFunction
 {
     FString Path;
-    void(* Func)(UObject*, FFrame*, void*);
+    void(* Func)(UObject*, FFrame&, void*);
     EFunctionFlags Flags;
     TArray<FDynamicProperty> Properties;
 };

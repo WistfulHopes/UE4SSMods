@@ -50,22 +50,22 @@ extern "C"
         delete mod;
     }
 
-    SUZIE_MOD_API void InsertClass(const FString& Path, FDynamicClass* Class)
+    EXTERN_C SUZIE_MOD_API void InsertClass(const FString& Path, FDynamicClass* Class)
     {
         Suzie::GetInstance()->InsertClass(Path, Class);
     }
 
-    SUZIE_MOD_API void InsertStruct(const FString& Path, FDynamicScriptStruct* Struct)
+    EXTERN_C SUZIE_MOD_API void InsertStruct(const FString& Path, FDynamicScriptStruct* Struct)
     {
         Suzie::GetInstance()->InsertStruct(Path, Struct);
     }
 
-    SUZIE_MOD_API void InsertEnum(const FString& Path, FDynamicEnum* Enum)
+    EXTERN_C SUZIE_MOD_API void InsertEnum(const FString& Path, FDynamicEnum* Enum)
     {
         Suzie::GetInstance()->InsertEnum(Path, Enum);
     }
 
-    SUZIE_MOD_API void InsertFunction(const FString& Path, FDynamicFunction* Function)
+    EXTERN_C SUZIE_MOD_API void InsertFunction(const FString& Path, FDynamicFunction* Function)
     {
         Suzie::GetInstance()->InsertFunction(Path, Function);
     }
