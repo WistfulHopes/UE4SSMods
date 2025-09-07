@@ -293,7 +293,7 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
     }
     
     // Convert struct flag names to the struct flags bitmask
-    EFunctionFlags FunctionFlags = FUNC_Native | Function.Flags;
+    EFunctionFlags FunctionFlags = Function.Flags;
 
     // Have to temporarily mark the function as RF_ArchetypeObject to be able to create functions with UPackage as outer
     UFunction* NewFunction = UObjectGlobals::NewObject<UFunction>(FunctionOuterObject, FName(*ObjectName, FNAME_Add), (EObjectFlags)(RF_Public | RF_MarkAsRootSet | RF_ArchetypeObject));
@@ -568,7 +568,7 @@ UPackage* Suzie::FindOrCreatePackage(const FString& PackageName)
 UClass* Suzie::FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Context, const FString& ClassPath)
 {
     // Attempt to find an existing class first
-    if (UClass* ExistingClass = UObjectGlobals::FindObject<UClass>(nullptr, *ClassPath))
+    if (UClass* ExistingClass = UObjectGlobals::StaticFindObject<UClass*>(nullptr, nullptr, *ClassPath))
     {
         return ExistingClass;
     }
