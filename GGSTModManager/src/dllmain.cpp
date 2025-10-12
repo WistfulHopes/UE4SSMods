@@ -126,7 +126,7 @@ void InitImGui()
     style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
     style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 
-    io.Fonts->Clear();
+    /*io.Fonts->Clear();
 
     float base_font_size = 14 * UE4SSProgram::settings_manager.Debug.DebugGUIFontScaling;
 
@@ -140,7 +140,7 @@ void InitImGui()
     font_cfg.FontDataOwnedByAtlas = false;
     
     // Build font atlas
-    io.Fonts->Build();
+    io.Fonts->Build();*/
 
     ImGui_ImplWin32_Init(window);
     ImGui_ImplDX11_Init(pDevice, pContext);
@@ -254,7 +254,7 @@ public:
         m_pak_reloader.init();
         d3d11_thread = std::thread(&GGSTModManager::init_d3d11, this);
 
-        register_keydown_event(Input::F1, [&]
+        register_keydown_event(Input::M, {Input::ModifierKey::CONTROL}, [&]
         {
             m_pak_reloader.toggle_open();
         });

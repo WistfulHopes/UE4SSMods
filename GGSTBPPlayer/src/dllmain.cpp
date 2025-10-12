@@ -167,7 +167,7 @@ namespace GGSTMods
             TArray<FString> Paths;
             const auto AssetName =
                 std::format(
-                    STR("/Game/Chara/{}/Costume{:02}/CharaBP.CharaBP_C"), info->CharaID.GetCharArray(),
+                    STR("/Game/Chara/{}/Costume{:02}/CharaBP.CharaBP_C"), info->CharaID.GetCharArray().GetData(),
                     info->CostumeID + 1);
             UGameAssetLoader_AddPackageName(Paths, FString(AssetName.c_str()));
             UGameAssetLoader_LoadAssets(pGameState, Paths, true);
