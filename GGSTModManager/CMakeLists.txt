@@ -23,4 +23,4 @@ set(${TARGET}_Sources
 add_library(${TARGET} SHARED ${${TARGET}_Sources})
 target_include_directories(${TARGET} PRIVATE "include")
 target_link_libraries(${TARGET} PUBLIC UE4SS)
-target_link_libraries(${TARGET} PUBLIC ImGui glaze::glaze minhook-static)
+target_link_libraries(${TARGET} PUBLIC ImGui glaze::glaze minhook)

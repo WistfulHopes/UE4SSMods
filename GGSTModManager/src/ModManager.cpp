@@ -9,16 +9,16 @@
 #include <SigScanner/SinglePassSigScanner.hpp>
 
 #include <imgui.h>
-#include <imgui_impl_dx11.h>
-#include <imgui_impl_win32.h>
+#include <backends/imgui_impl_dx11.h>
+#include <backends/imgui_impl_win32.h>
 #include <glaze/json/read.hpp>
-#include <glaze/json/write.hpp>
 #include <misc/cpp/imgui_stdlib.h>
 
 #include "FString.hpp"
 #include "UE4SSProgram.hpp"
 
 #include <ShObjIdl_core.h>
+#include <glaze/json/write.hpp>
 
 namespace RC::GUI::ModManager
 {
@@ -454,7 +454,7 @@ namespace RC::GUI::ModManager
         std::vector<ModEntry> enabled_mods;
         std::vector<ModEntry> disabled_mods;
 
-        for (auto entry : m_config.m_mods)
+        for (const auto& entry : m_config.m_mods)
         {
             if (entry.enabled) enabled_mods.emplace_back(entry);
             else disabled_mods.emplace_back(entry);
