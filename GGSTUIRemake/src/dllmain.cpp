@@ -6,9 +6,11 @@
 #include "AActor.hpp"
 #include "BPMacros.hpp"
 #include "REDGameMode_CharaSelectRE.h"
+#include "REDGameState.h"
 #include "REDGameState_CharaSelectRE.h"
 #include "UE4SSProgram.hpp"
 #include "UFunction.hpp"
+#include "SigScanner/SinglePassSigScanner.hpp"
 
 namespace GGSTMods
 {
@@ -44,8 +46,45 @@ namespace GGSTMods
         {
         }
 
+        auto get_signatures()
+        {
+            const SignatureContainer OnStartedLobbyTraining{
+                {{"40 53 48 83 EC 20 48 81 C1 90 01 00 00 E8"}},
+                [&](const SignatureContainer& self)
+                {
+                    AREDGameState_CharaSelectRE::OnStartedLobbyTraining_Func.assign_address(self.get_match_address());
+                    return true;
+                },
+                [](SignatureContainer& self)
+                {
+                },
+            };
+            const SignatureContainer AREDHUD_FadeIn{
+                {{"48 89 5C 24 ? 57 48 83 EC 20 8B FA 48 8B D9 E8 ? ? ? ? 48 85 C0"}},
+                [&](const SignatureContainer& self)
+                {
+                    AREDGameState_CharaSelectRE::AREDHUD_FadeIn_Func.assign_address(self.get_match_address());
+                    return true;
+                },
+                [](SignatureContainer& self)
+                {
+                },
+            };
+
+            std::vector<SignatureContainer> signature_containers;
+            signature_containers.push_back(OnStartedLobbyTraining);
+            signature_containers.push_back(AREDHUD_FadeIn);
+
+            SinglePassScanner::SignatureContainerMap signature_containers_map;
+            signature_containers_map.emplace(ScanTarget::MainExe, signature_containers);
+
+            SinglePassScanner::start_scan(signature_containers_map);
+        }
+        
         auto on_unreal_init() -> void override
         {
+            get_signatures();
+            
             AREDGameState_CharaSelectRE::InitializeClass();
             AREDGameMode_CharaSelectRE::InitializeClass();
             FCharaSelectPlayerParam::InitializeStruct();

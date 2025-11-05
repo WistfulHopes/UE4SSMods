@@ -10,7 +10,9 @@
 #include "UObject.hpp"
 #include "SigScanner/SinglePassSigScanner.hpp"
 
-#define RIOT
+// #define RIOT
+#define ISUKA
+// #define LANE_SYSTEM
 
 using namespace RC::Unreal;
 
@@ -655,8 +657,8 @@ public:
         int InstantBlockXAirPushback = 0;
         int InstantBlockWindow = 2;
 
-        patch_exe_bytes(DBMTable + 501 * 4, (PBYTE)&WorldWidthScale, 4);
-        patch_exe_bytes(DBMTable + 505 * 4, (PBYTE)&ScreenZoomScale, 4);
+        patch_exe_bytes(DBMTable + 508 * 4, (PBYTE)&WorldWidthScale, 4);
+        patch_exe_bytes(DBMTable + 512 * 4, (PBYTE)&ScreenZoomScale, 4);
         patch_exe_bytes(DBMTable + 174 * 4, (PBYTE)&InstantBlockXPushback, 4);
         patch_exe_bytes(DBMTable + 178 * 4, (PBYTE)&InstantBlockXAirPushback, 4);
         patch_exe_bytes(DBMTable + 176 * 4, (PBYTE)&InstantBlockWindow, 4);
@@ -1062,16 +1064,36 @@ public:
 
                 // Data modification
                 int WorldWidthScale = 1000;
-                int ScreenZoomScale = 1100;
+                int ScreenZoomScale = 1200;
                 int InstantBlockXPushback = 500;
                 int InstantBlockXAirPushback = 750;
                 int InstantBlockWindow = 8;
 
-                patch_exe_bytes(DBMTable + 501 * 4, (PBYTE)&WorldWidthScale, 4);
-                patch_exe_bytes(DBMTable + 505 * 4, (PBYTE)&ScreenZoomScale, 4);
+                patch_exe_bytes(DBMTable + 508 * 4, (PBYTE)&WorldWidthScale, 4);
+                patch_exe_bytes(DBMTable + 512 * 4, (PBYTE)&ScreenZoomScale, 4);
                 patch_exe_bytes(DBMTable + 174 * 4, (PBYTE)&InstantBlockXPushback, 4);
                 patch_exe_bytes(DBMTable + 178 * 4, (PBYTE)&InstantBlockXAirPushback, 4);
                 patch_exe_bytes(DBMTable + 176 * 4, (PBYTE)&InstantBlockWindow, 4);
+
+                return true;
+            },
+            [](SignatureContainer& self)
+            {
+            },
+        };
+
+        // Isuka DBM
+        const SignatureContainer isuka_dbm_table_sig{
+            {{.signature = "8B 0D ? ? ? ? 0F AF CF"}},
+            [&](const SignatureContainer& self)
+            {
+                DBMTable = *reinterpret_cast<int*>(self.get_match_address() + 0x2) + (uintptr_t)self.get_match_address()
+                    + 6 - 283 * 4;
+
+                // Data modification
+                int ScreenZoomScale = 1350;
+
+                patch_exe_bytes(DBMTable + 512 * 4, (PBYTE)&ScreenZoomScale, 4);
 
                 return true;
             },
@@ -1776,15 +1798,18 @@ public:
         
         // isuka
 #ifdef ISUKA
+        signature_containers.push_back(isuka_dbm_table_sig);
+        signature_containers.push_back(multiple_characters_sig);
+        signature_containers.push_back(multiple_characters_2_sig);
+#endif
+#ifdef LANE_SYSTEM
         signature_containers.push_back(is_object_to_object_push_collision_matched_sig);
         signature_containers.push_back(func_call_by_switch_case_table_sig);
         signature_containers.push_back(check_hit_type_sig);
         signature_containers.push_back(get_operand_value_sig);
         signature_containers.push_back(object_initialize_on_activate_sig);
-        signature_containers.push_back(multiple_characters_sig);
-        signature_containers.push_back(multiple_characters_2_sig);
 #endif
-        
+
         SinglePassScanner::SignatureContainerMap signature_containers_map;
         signature_containers_map.emplace(ScanTarget::MainExe, signature_containers);
 

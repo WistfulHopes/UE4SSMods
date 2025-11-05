@@ -247,11 +247,11 @@ UEnum* Suzie::FindOrCreateEnum(FDynamicClassGenerationContext& Context, const FS
         const int64 EnumConstantValue = Pair.Value;
 
         EnumNames.Add({FName(*EnumConstantName, FNAME_Add), EnumConstantValue});
-        bContainsFullyQualifiedNames |= std::wstring(EnumConstantName.GetCharArray()).contains(TEXT("::"));
+        bContainsFullyQualifiedNames |= std::wstring(EnumConstantName.GetCharArray().GetData()).contains(TEXT("::"));
     }
 
     // TODO: CppForm and Flags are not currently dumped, but we can assume flags None for most enums and guess CppForm based on names and CppType
-    const bool bCppTypeIsNamespaced = std::wstring(NewEnum->GetCppType().GetCharArray()).contains(TEXT("::"));
+    const bool bCppTypeIsNamespaced = std::wstring(NewEnum->GetCppType().GetCharArray().GetData()).contains(TEXT("::"));
     const UEnum::ECppForm EnumCppForm = bContainsFullyQualifiedNames ? (bCppTypeIsNamespaced ? UEnum::ECppForm::Namespaced : UEnum::ECppForm::EnumClass) : UEnum::ECppForm::Regular;
 
     // We do not need to generate _MAX key because it will always be present in the enum definition
@@ -275,7 +275,7 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
 
     // Function can be outered either to a class or to a package, we can decide based on whenever there is a separator in the path
     UObject* FunctionOuterObject;
-    if (std::wstring(ClassPathOrPackageName.GetCharArray()).contains('.'))
+    if (std::wstring(ClassPathOrPackageName.GetCharArray().GetData()).contains('.'))
     {
         // This is a class path because it is at least two levels deep. We do not need our outer to be registered, just to exist
         FunctionOuterObject = FindOrCreateUnregisteredClass(Context, ClassPathOrPackageName);
@@ -335,7 +335,7 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
 
     // Function can be outered either to a class or to a package, we can decide based on whenever there is a separator in the path
     UObject* FunctionOuterObject;
-    if (std::wstring(ClassPathOrPackageName.GetCharArray()).contains('.'))
+    if (std::wstring(ClassPathOrPackageName.GetCharArray().GetData()).contains('.'))
     {
         // This is a class path because it is at least two levels deep. We do not need our outer to be registered, just to exist
         FunctionOuterObject = FindOrCreateUnregisteredClass(Context, ClassPathOrPackageName);
@@ -702,7 +702,7 @@ void Suzie::FinalizeClass(FDynamicClassGenerationContext& Context, UClass* Class
 
 void Suzie::ParseObjectPath(const FString& ObjectPath, FString& OutOuterObjectPath, FString& OutObjectName)
 {
-    auto ObjectPathWString = std::wstring(ObjectPath.GetCharArray());
+    auto ObjectPathWString = std::wstring(ObjectPath.GetCharArray().GetData());
     if (size_t ObjectNameSeparatorIndex = ObjectPathWString.find(STR(":")); ObjectNameSeparatorIndex != ObjectPathWString.npos)
     {
         // There is a sub-object separator in the path name, string past it is the object name
