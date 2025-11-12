@@ -57,7 +57,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
 
 #define CLONE_VTABLE(VTable, Size)                              \
     auto OrigVTable = *reinterpret_cast<uintptr_t**>(this);     \
-    FMemory::Memcpy(VTable, OrigVTable, 0x828);                 \
+    FMemory::Memcpy(VTable, OrigVTable, Size * 8);                 \
     *reinterpret_cast<uintptr_t*>(this) = (uintptr_t)&VTable;
 
 #define ASSIGN_TO_VTABLE(VTable, Index, Class, OriginalFunc, OverrideFunc)  \

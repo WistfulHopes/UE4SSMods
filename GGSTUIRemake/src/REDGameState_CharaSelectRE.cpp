@@ -192,7 +192,7 @@ void AREDGameState_CharaSelectRE::InitializeClass()
 
 void AREDGameState_CharaSelectRE::InitializeVTable()
 {
-    CLONE_VTABLE(VTable, 0x828)
+    CLONE_VTABLE(VTable, 0x105)
 
     ASSIGN_TO_VTABLE(VTable, 0x65, AREDGameState_CharaSelectRE, BeginPlay_Func, BeginPlay)
     ASSIGN_TO_VTABLE(VTable, 0xD8, AREDGameState_CharaSelectRE, HandleMatchIsWaitingToStart_Func,
