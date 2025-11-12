@@ -3,6 +3,7 @@
 #include "BPMacros.hpp"
 #include "UFunction.hpp"
 #include "../../SuzieMod/include/ScriptMacros.hpp"
+#include "../../SuzieMod/include/MiscMacros.hpp"
 #include "Property/NumericPropertyTypes.hpp"
 
 IMPLEMENT_EXTERNAL_OBJECT_CLASS(AGameStateBase);
@@ -11,78 +12,26 @@ IMPLEMENT_EXTERNAL_OBJECT_CLASS(AREDGameState_CharaSelectRE);
 
 void FCharaSelectPlayerParam::InitializeStruct()
 {
-    Struct = {
-        .Properties = {
-            FDynamicProperty{
-                .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_IsPlainOldData | CPF_NoDestructor |
-                CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                .Name = FString(STR("Cursor")),
-                .Type = FString(STR("IntProperty")),
-                .ArrayDim = 1,
-                .Offset = offsetof(FCharaSelectPlayerParam, Cursor),
-            },
-            FDynamicProperty{
-                .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_ZeroConstructor | CPF_IsPlainOldData | CPF_NoDestructor |
-                CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                .Name = FString(STR("CursorPos")),
-                .Type = FString(STR("StructProperty")),
-                .ArrayDim = 1,
-                .Offset = offsetof(FCharaSelectPlayerParam, CursorPos),
-                .Struct = FString(STR("/Script/CoreUObject.Vector")),
-            },
-            FDynamicProperty{
-                .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_IsPlainOldData | CPF_NoDestructor |
-                CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                .Name = FString(STR("RandomCounter")),
-                .Type = FString(STR("IntProperty")),
-                .ArrayDim = 1,
-                .Offset = offsetof(FCharaSelectPlayerParam, RandomCounter),
-            },
-            FDynamicProperty{
-                .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_ZeroConstructor | CPF_IsPlainOldData | CPF_NoDestructor |
-                CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                .Name = FString(STR("bRandomSelect")),
-                .Type = FString(STR("BoolProperty")),
-                .ArrayDim = 1,
-                .Offset = offsetof(FCharaSelectPlayerParam, bRandomSelect),
-            },
-            FDynamicProperty{
-                .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_IsPlainOldData | CPF_NoDestructor |
-                CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                .Name = FString(STR("PrevCursor")),
-                .Type = FString(STR("IntProperty")),
-                .ArrayDim = 1,
-                .Offset = offsetof(FCharaSelectPlayerParam, PrevCursor),
-            },
-            FDynamicProperty{
-                .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_IsPlainOldData | CPF_NoDestructor |
-                CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                .Name = FString(STR("SelectColor")),
-                .Type = FString(STR("IntProperty")),
-                .ArrayDim = 1,
-                .Offset = offsetof(FCharaSelectPlayerParam, SelectColor),
-            },
-            FDynamicProperty{
-                .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_IsPlainOldData | CPF_NoDestructor |
-                CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                .Name = FString(STR("SelectChara")),
-                .Type = FString(STR("IntProperty")),
-                .ArrayDim = 1,
-                .Offset = offsetof(FCharaSelectPlayerParam, SelectColor),
-            },
-            FDynamicProperty{
-                .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_ZeroConstructor | CPF_IsPlainOldData | CPF_NoDestructor |
-                CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                .Name = FString(STR("bSelectCPU")),
-                .Type = FString(STR("BoolProperty")),
-                .ArrayDim = 1,
-                .Offset = offsetof(FCharaSelectPlayerParam, bSelectCPU),
-            }
-        },
-    };
+    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, Cursor,
+                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    COMPLEX_PROPERTY_DEFINE(FVector, FCharaSelectPlayerParam, CursorPos,
+                            CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                            FString(STR("/Script/CoreUObject.Vector")))
+    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, RandomCounter,
+                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    PROPERTY_DEFINE(bool, FCharaSelectPlayerParam, bRandomSelect,
+                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, PrevCursor,
+                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, SelectColor,
+                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, SelectChara,
+                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    PROPERTY_DEFINE(bool, FCharaSelectPlayerParam, bSelectCPU,
+                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
 }
 
-FDynamicClass AREDGameState_CharaSelectRE::Class = {
+FDynamicClass AREDGameState_CharaSelectRE::Data = {
     .Ctor = &AREDGameState_CharaSelectRE::AREDGameState_CharaSelectRE_Ctor,
 };
 
@@ -97,7 +46,7 @@ void AREDGameState_CharaSelectRE::execGetPlayerParam(UObject* Context, [[maybe_u
     P_NATIVE_END;
 }
 
-FCharaSelectPlayerParam AREDGameState_CharaSelectRE::GetPlayerParam(int32 Side) const
+FCharaSelectPlayerParam AREDGameState_CharaSelectRE::GetPlayerParam(const int32 Side) const
 {
     if (Side >= 2 || Side <= 0) return PlayerParam[0];
     return PlayerParam[Side];
@@ -113,7 +62,7 @@ void AREDGameState_CharaSelectRE::execSetPlayerParam(UObject* Context, FFrame& S
     P_NATIVE_END
 }
 
-void AREDGameState_CharaSelectRE::SetPlayerParam(int32 Side, FCharaSelectPlayerParam Param)
+void AREDGameState_CharaSelectRE::SetPlayerParam(const int32 Side, FCharaSelectPlayerParam Param)
 {
     if (Side >= 2 || Side <= 0) PlayerParam[0] = Param;
     else PlayerParam[Side] = Param;
@@ -190,7 +139,7 @@ void AREDGameState_CharaSelectRE::SceneInitialize()
 AActor* AREDGameState_CharaSelectRE::GetHUD()
 {
     using namespace RC;
-        
+
     auto Function = PrimaryPC->GetFunctionByNameInChain(STR("GetHUD"));
     static auto ParamStructSize = Function->GetParmsSize();
     const auto ParamData = static_cast<uint8*>(_malloca(ParamStructSize));
@@ -203,11 +152,7 @@ AActor* AREDGameState_CharaSelectRE::GetHUD()
 
 void AREDGameState_CharaSelectRE::AREDGameState_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer)
 {
-    auto Super = StaticClass()->GetSuperClass();
-    uintptr_t CtorAddr = reinterpret_cast<uintptr_t>(Super->GetClassConstructor()) + 0xE;
-    CtorAddr = *reinterpret_cast<int*>(CtorAddr + 0x1) + (CtorAddr + 0x5);
-    auto Ctor = reinterpret_cast<void(*)(UObject*, const FObjectInitializer*)>(CtorAddr);
-    Ctor(ObjectInitializer->Obj, ObjectInitializer);
+    CALL_BASE_CTOR()
 
     auto CastContext = static_cast<AREDGameState_CharaSelectRE*>(ObjectInitializer->Obj);
 
@@ -218,84 +163,39 @@ void AREDGameState_CharaSelectRE::AREDGameState_CharaSelectRE_Ctor(const FObject
 
 void AREDGameState_CharaSelectRE::InitializeClass()
 {
-    Class.ClassDefaultObjectPath = FString(STR("/Script/REDExtend.Default__REDGameState_CharaSelectRE"));
-    Class.SuperStruct = FString(STR("/Script/RED.REDGameState"));
-    Class.Properties = {
-        FDynamicProperty{
-            .Flags = CPF_Edit | CPF_BlueprintVisible | CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-            .Name = FString(STR("PlayerParam")),
-            .Type = FString(STR("StructProperty")),
-            .ArrayDim = 2,
-            .Offset = offsetof(AREDGameState_CharaSelectRE, PlayerParam),
-            .Struct = FString(STR("/Script/REDExtend.CharaSelectPlayerParam")),
-        },
-    };
-    Class.Functions = {
-        FDynamicFunction{
-            .Path = FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:GetPlayerParam")),
-            .Func = &AREDGameState_CharaSelectRE::execGetPlayerParam,
-            .Flags = FUNC_Public | FUNC_BlueprintCallable | FUNC_BlueprintPure,
-            .Properties = {
-                FDynamicProperty{
-                    .Flags = CPF_ConstParm | CPF_Parm | CPF_ZeroConstructor | CPF_IsPlainOldData | CPF_NoDestructor |
-                    CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                    .Name = FString(STR("Side")),
-                    .Type = FString(STR("IntProperty")),
-                    .Offset = 0,
-                },
-                FDynamicProperty{
-                    .Flags = CPF_Parm | CPF_OutParm | CPF_ZeroConstructor | CPF_ReturnParm | CPF_IsPlainOldData |
-                    CPF_NoDestructor | CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                    .Name = FString(STR("ReturnValue")),
-                    .Type = FString(STR("StructProperty")),
-                    .Offset = 4,
-                    .Struct = FString(STR("/Script/REDExtend.CharaSelectPlayerParam")),
-                },
-            },
-        },
-        FDynamicFunction{
-            .Path = FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:SetPlayerParam")),
-            .Func = &AREDGameState_CharaSelectRE::execSetPlayerParam,
-            .Flags = FUNC_Public | FUNC_BlueprintCallable,
-            .Properties = {
-                FDynamicProperty{
-                    .Flags = CPF_ConstParm | CPF_Parm | CPF_ZeroConstructor | CPF_IsPlainOldData | CPF_NoDestructor |
-                    CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                    .Name = FString(STR("Side")),
-                    .Type = FString(STR("IntProperty")),
-                    .Offset = 0,
-                },
-                FDynamicProperty{
-                    .Flags = CPF_Parm | CPF_ZeroConstructor | CPF_IsPlainOldData | CPF_NoDestructor |
-                    CPF_HasGetValueTypeHash | CPF_NativeAccessSpecifierPublic,
-                    .Name = FString(STR("Param")),
-                    .Type = FString(STR("StructProperty")),
-                    .Offset = 4,
-                    .Struct = FString(STR("/Script/REDExtend.CharaSelectPlayerParam")),
-                },
-            },
-        },
-        FDynamicFunction{
-            .Path = FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:InitializeWidget")),
-            .Flags = FUNC_Event | FUNC_Public | FUNC_BlueprintEvent,
-        },
-    };
+    Data.ClassDefaultObjectPath = FString(STR("/Script/REDExtend.Default__REDGameState_CharaSelectRE"));
+    Data.SuperStruct = FString(STR("/Script/RED.REDGameState"));
+
+    COMPLEX_PROPERTY_DEFINE(FCharaSelectPlayerParam, AREDGameState_CharaSelectRE, PlayerParam,
+                            CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                            FString(STR("/Script/REDExtend.CharaSelectPlayerParam")))
+    {
+        PARAM_BEGIN()
+        PARAM_DEFINE(const int32, Side, CPF_None)
+        COMPLEX_PARAM_DEFINE(FCharaSelectPlayerParam, ReturnValue, CPF_ReturnParm,
+                             FString(STR("/Script/REDExtend.CharaSelectPlayerParam")))
+        FUNCTION_DEFINE(AREDGameState_CharaSelectRE, execGetPlayerParam,
+                        FUNC_Public | FUNC_BlueprintCallable | FUNC_BlueprintPure,
+                        FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:GetPlayerParam")), Params)
+    }
+    {
+        PARAM_BEGIN()
+        PARAM_DEFINE(const int32, Side, CPF_None)
+        COMPLEX_PARAM_DEFINE(FCharaSelectPlayerParam, Param, CPF_None,
+                             FString(STR("/Script/REDExtend.CharaSelectPlayerParam")))
+        FUNCTION_DEFINE(AREDGameState_CharaSelectRE, execSetPlayerParam,
+                        FUNC_Public | FUNC_BlueprintCallable | FUNC_BlueprintPure,
+                        FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:SetPlayerParam")), Params)
+    }
+    EVENT_DEFINE(FUNC_BlueprintEvent, FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:InitializeWidget")), {})
 }
 
 void AREDGameState_CharaSelectRE::InitializeVTable()
 {
-    auto OrigVTable = *reinterpret_cast<uintptr_t**>(this);
+    CLONE_VTABLE(VTable, 0x828)
 
-    FMemory::Memcpy(VTable, OrigVTable, 0x828);
-    *reinterpret_cast<uintptr_t*>(this) = (uintptr_t)&VTable;
-
-    BeginPlay_Func.assign_address((void*)VTable[0x65]);
-    HandleMatchIsWaitingToStart_Func.assign_address((void*)VTable[0xD8]);
-    SceneInitialize_Func.assign_address((void*)VTable[0xE3]);
-
-    *reinterpret_cast<void(AREDGameState_CharaSelectRE::**)()>(&VTable[0x65]) = &AREDGameState_CharaSelectRE::BeginPlay;
-    *reinterpret_cast<void(AREDGameState_CharaSelectRE::**)()>(&VTable[0xD8]) =
-        &AREDGameState_CharaSelectRE::HandleMatchIsWaitingToStart;
-    *reinterpret_cast<void(AREDGameState_CharaSelectRE::**)()>(&VTable[0xE3]) =
-        &AREDGameState_CharaSelectRE::SceneInitialize;
+    ASSIGN_TO_VTABLE(VTable, 0x65, AREDGameState_CharaSelectRE, BeginPlay_Func, BeginPlay)
+    ASSIGN_TO_VTABLE(VTable, 0xD8, AREDGameState_CharaSelectRE, HandleMatchIsWaitingToStart_Func,
+                     HandleMatchIsWaitingToStart)
+    ASSIGN_TO_VTABLE(VTable, 0xE3, AREDGameState_CharaSelectRE, SceneInitialize_Func, SceneInitialize)
 }

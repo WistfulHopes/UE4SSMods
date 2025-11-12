@@ -94,8 +94,8 @@ namespace GGSTMods
                 typedef int (*InsertClass_t)(FString, FDynamicClass*);
                 if (const auto InsertClass = reinterpret_cast<InsertClass_t>(GetProcAddress(Suzie, "InsertClass")))
                 {
-                    InsertClass(FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE")), &AREDGameState_CharaSelectRE::Class);
-                    InsertClass(FString(STR("/Script/REDExtend.REDGameMode_CharaSelectRE")), &AREDGameMode_CharaSelectRE::Class);
+                    InsertClass(FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE")), &AREDGameState_CharaSelectRE::Data);
+                    InsertClass(FString(STR("/Script/REDExtend.REDGameMode_CharaSelectRE")), &AREDGameMode_CharaSelectRE::Data);
                 }
                 else
                 {
@@ -105,7 +105,7 @@ namespace GGSTMods
                 typedef int (*InsertStruct_t)(FString, FDynamicScriptStruct*);
                 if (const auto InsertStruct = reinterpret_cast<InsertStruct_t>(GetProcAddress(Suzie, "InsertStruct")))
                 {
-                    InsertStruct(FString(STR("/Script/REDExtend.CharaSelectPlayerParam")), &FCharaSelectPlayerParam::Struct);
+                    InsertStruct(FString(STR("/Script/REDExtend.CharaSelectPlayerParam")), &FCharaSelectPlayerParam::Data);
                 }
                 else
                 {

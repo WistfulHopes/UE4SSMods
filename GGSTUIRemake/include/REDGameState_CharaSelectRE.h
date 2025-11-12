@@ -53,7 +53,7 @@ struct FCharaSelectPlayerParam
 
     static void InitializeStruct();
     
-    static inline FDynamicScriptStruct Struct;
+    static inline FDynamicScriptStruct Data;
 };
 
 class AREDGameState_CharaSelectRE : public AREDGameState
@@ -64,10 +64,10 @@ public:
     FCharaSelectPlayerParam PlayerParam[2];
     
     static void execGetPlayerParam(UObject* Context, FFrame& Stack, void* Z_Param__Result);
-    FCharaSelectPlayerParam GetPlayerParam(int32 Side) const;
+    FCharaSelectPlayerParam GetPlayerParam(const int32 Side) const;
     
     static void execSetPlayerParam(UObject* Context, FFrame& Stack, void* Z_Param__Result);
-    void SetPlayerParam(int32 Side, FCharaSelectPlayerParam Param);
+    void SetPlayerParam(const int32 Side, FCharaSelectPlayerParam Param);
     
     void InitializeWidget();
 
@@ -88,7 +88,7 @@ public:
 
     static inline RC::Function<void(UObject*)> OnStartedLobbyTraining_Func;
     
-    static FDynamicClass Class;
+    static FDynamicClass Data;
 
 private:
     static inline uintptr_t VTable[0x105];

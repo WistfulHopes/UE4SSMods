@@ -29,5 +29,5 @@ public:
     static void AREDGameMode_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer);
     static void InitializeClass();
     
-    static FDynamicClass Class;
+    static FDynamicClass Data;
 };
