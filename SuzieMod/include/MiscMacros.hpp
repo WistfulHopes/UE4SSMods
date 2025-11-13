@@ -101,7 +101,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
     if (TModels_V<CGetTypeHashable, TypeName>)                                                      \
         Flags |= CPF_HasGetValueTypeHash;
 
-#define PROPERTY_DEFINE(TypeName, ClassName, MemberName, InFlags)                                   \
+#define CREATE_PROPERTY(TypeName, ClassName, MemberName, InFlags)                                   \
     {                                                                                               \
         PROPERTY_FLAGS(TypeName)                                                                    \
         Flags |= InFlags;                                                                           \
@@ -116,7 +116,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Data.Properties.Add(Property);                                                              \
     }
 
-#define COMPLEX_PROPERTY_DEFINE(TypeName, ClassName, MemberName, InFlags, ScriptPath)               \
+#define CREATE_COMPLEX_PROPERTY(TypeName, ClassName, MemberName, InFlags, ScriptPath)               \
     {                                                                                               \
         PROPERTY_FLAGS(TypeName)                                                                    \
         Flags |= InFlags;                                                                           \
@@ -141,7 +141,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Data.Properties.Add(Property);                                                              \
     }
 
-#define ARRAY_PROPERTY_DEFINE(TypeName, ClassName, MemberName, InFlags, InArrayDim)                 \
+#define CREATE_ARRAY_PROPERTY(TypeName, ClassName, MemberName, InFlags, InArrayDim)                 \
     {                                                                                               \
         PROPERTY_FLAGS(TypeName)                                                                    \
         Flags |= InFlags;                                                                           \
@@ -156,7 +156,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Data.Properties.Add(Property);                                                              \
     }
 
-#define COMPLEX_ARRAY_PROPERTY_DEFINE(TypeName, ClassName, MemberName, InFlags, ScriptPath, InArrayDim) \
+#define CREATE_COMPLEX_ARRAY_PROPERTY(TypeName, ClassName, MemberName, InFlags, ScriptPath, InArrayDim) \
     {                                                                                                   \
         PROPERTY_FLAGS(TypeName)                                                                        \
         Flags |= InFlags;                                                                               \
@@ -181,7 +181,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Data.Properties.Add(Property);                                                                  \
     }
 
-#define FUNCTION_DEFINE(ClassName, FuncName, InFlags, ScriptPath, Params)       \
+#define CREATE_FUNCTION(ClassName, FuncName, InFlags, ScriptPath, Params)       \
     {                                                                           \
         auto Function = FDynamicFunction {                                      \
             .Path = ScriptPath,                                                 \
@@ -192,7 +192,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Data.Functions.Add(Function);                                           \
     }
 
-#define EVENT_DEFINE(InFlags, ScriptPath, Params)                               \
+#define CREATE_EVENT(InFlags, ScriptPath, Params)                               \
     {                                                                           \
         auto Function = FDynamicFunction {                                      \
             .Path = ScriptPath,                                                 \
@@ -223,7 +223,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
     if (IsStructProperty)                                       \
         ParamType = FString(STR("StructProperty"));
 
-#define PARAM_DEFINE(TypeName, ParamName, InFlags)                                              \
+#define CREATE_PARAM(TypeName, ParamName, InFlags)                                              \
     {                                                                                           \
         PROPERTY_FLAGS(TypeName)                                                                \
         PARAM_FLAGS(TypeName)                                                                   \
@@ -238,7 +238,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Offset += sizeof(TypeName);                                                             \
     }
 
-#define COMPLEX_PARAM_DEFINE(TypeName, ParamName, InFlags, ScriptPath)                          \
+#define CREATE_COMPLEX_PARAM(TypeName, ParamName, InFlags, ScriptPath)                          \
     {                                                                                           \
         PROPERTY_FLAGS(TypeName)                                                                \
         PARAM_FLAGS(TypeName)                                                                   \

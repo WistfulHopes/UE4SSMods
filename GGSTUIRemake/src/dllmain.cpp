@@ -46,7 +46,7 @@ namespace GGSTMods
         {
         }
 
-        auto get_signatures()
+        static auto get_signatures()
         {
             const SignatureContainer OnStartedLobbyTraining{
                 {{"40 53 48 83 EC 20 48 81 C1 90 01 00 00 E8"}},

@@ -12,22 +12,22 @@ IMPLEMENT_EXTERNAL_OBJECT_CLASS(AREDGameState_CharaSelectRE);
 
 void FCharaSelectPlayerParam::InitializeStruct()
 {
-    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, Cursor,
+    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, Cursor,
                     CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
-    COMPLEX_PROPERTY_DEFINE(FVector, FCharaSelectPlayerParam, CursorPos,
+    CREATE_COMPLEX_PROPERTY(FVector, FCharaSelectPlayerParam, CursorPos,
                             CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
                             FString(STR("/Script/CoreUObject.Vector")))
-    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, RandomCounter,
+    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, RandomCounter,
                     CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
-    PROPERTY_DEFINE(bool, FCharaSelectPlayerParam, bRandomSelect,
+    CREATE_PROPERTY(bool, FCharaSelectPlayerParam, bRandomSelect,
                     CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
-    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, PrevCursor,
+    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, PrevCursor,
                     CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
-    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, SelectColor,
+    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, SelectColor,
                     CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
-    PROPERTY_DEFINE(int32, FCharaSelectPlayerParam, SelectChara,
+    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, SelectChara,
                     CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
-    PROPERTY_DEFINE(bool, FCharaSelectPlayerParam, bSelectCPU,
+    CREATE_PROPERTY(bool, FCharaSelectPlayerParam, bSelectCPU,
                     CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
 }
 
@@ -166,28 +166,28 @@ void AREDGameState_CharaSelectRE::InitializeClass()
     Data.ClassDefaultObjectPath = FString(STR("/Script/REDExtend.Default__REDGameState_CharaSelectRE"));
     Data.SuperStruct = FString(STR("/Script/RED.REDGameState"));
 
-    COMPLEX_PROPERTY_DEFINE(FCharaSelectPlayerParam, AREDGameState_CharaSelectRE, PlayerParam,
+    CREATE_COMPLEX_PROPERTY(FCharaSelectPlayerParam, AREDGameState_CharaSelectRE, PlayerParam,
                             CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
                             FString(STR("/Script/REDExtend.CharaSelectPlayerParam")))
     {
         PARAM_BEGIN()
-        PARAM_DEFINE(const int32, Side, CPF_None)
-        COMPLEX_PARAM_DEFINE(FCharaSelectPlayerParam, ReturnValue, CPF_ReturnParm,
+        CREATE_PARAM(const int32, Side, CPF_None)
+        CREATE_COMPLEX_PARAM(FCharaSelectPlayerParam, ReturnValue, CPF_ReturnParm,
                              FString(STR("/Script/REDExtend.CharaSelectPlayerParam")))
-        FUNCTION_DEFINE(AREDGameState_CharaSelectRE, execGetPlayerParam,
+        CREATE_FUNCTION(AREDGameState_CharaSelectRE, execGetPlayerParam,
                         FUNC_Public | FUNC_BlueprintCallable | FUNC_BlueprintPure,
                         FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:GetPlayerParam")), Params)
     }
     {
         PARAM_BEGIN()
-        PARAM_DEFINE(const int32, Side, CPF_None)
-        COMPLEX_PARAM_DEFINE(FCharaSelectPlayerParam, Param, CPF_None,
+        CREATE_PARAM(const int32, Side, CPF_None)
+        CREATE_COMPLEX_PARAM(FCharaSelectPlayerParam, Param, CPF_None,
                              FString(STR("/Script/REDExtend.CharaSelectPlayerParam")))
-        FUNCTION_DEFINE(AREDGameState_CharaSelectRE, execSetPlayerParam,
+        CREATE_FUNCTION(AREDGameState_CharaSelectRE, execSetPlayerParam,
                         FUNC_Public | FUNC_BlueprintCallable | FUNC_BlueprintPure,
                         FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:SetPlayerParam")), Params)
     }
-    EVENT_DEFINE(FUNC_BlueprintEvent, FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:InitializeWidget")), {})
+    CREATE_EVENT(FUNC_BlueprintEvent, FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:InitializeWidget")), {})
 }
 
 void AREDGameState_CharaSelectRE::InitializeVTable()
