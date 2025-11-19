@@ -1,7 +1,6 @@
 #include "REDGameState_CharaSelectRE.h"
 
 #include "BPMacros.hpp"
-#include "UFunction.hpp"
 #include "../../SuzieMod/include/ScriptMacros.hpp"
 #include "../../SuzieMod/include/MiscMacros.hpp"
 #include "Property/NumericPropertyTypes.hpp"
@@ -10,25 +9,71 @@ IMPLEMENT_EXTERNAL_OBJECT_CLASS(AGameStateBase);
 IMPLEMENT_EXTERNAL_OBJECT_CLASS(AREDGameState);
 IMPLEMENT_EXTERNAL_OBJECT_CLASS(AREDGameState_CharaSelectRE);
 
+FDynamicEnum ECharaState_Data{};
+
+void ECharaState_InitializeEnum()
+{
+    ECharaState_Data.CppType = FString(STR("Regular"));
+    ECharaState_Data.Pairs.Add(FString(STR("CharaState_First")), CharaState_First);
+    ECharaState_Data.Pairs.Add(FString(STR("CharaState_Second")), CharaState_Second);
+    ECharaState_Data.Pairs.Add(FString(STR("CharaState_Third")), CharaState_Third);
+    ECharaState_Data.Pairs.Add(FString(STR("CharaState_ColorCostume")), CharaState_ColorCostume);
+    ECharaState_Data.Pairs.Add(FString(STR("CharaState_Ready")), CharaState_Ready);
+}
+
+void FDecideInfo::InitializeStruct()
+{
+    CREATE_ENUM_PROPERTY(ECharaID, FDecideInfo, CharaID,
+                     CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                     FString(STR("/Script/RED.ECharaID")), uint8)
+    CREATE_ENUM_PROPERTY(EColorID, FDecideInfo, ColorID,
+                     CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                     FString(STR("/Script/RED.EColorID")), uint8)
+    CREATE_ENUM_PROPERTY(ECostumeID, FDecideInfo, CostumeID,
+                     CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                     FString(STR("/Script/RED.ECostumeID")), uint8)
+    CREATE_ENUM_PROPERTY(EBattleScript, FDecideInfo, ScriptID,
+                     CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                     FString(STR("/Script/RED.EBattleScript")), uint8)
+    CREATE_PROPERTY(uint8, FDecideInfo, SpFlag,
+                CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    CREATE_PROPERTY(int32, FDecideInfo, SkillSetIndex,
+                CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+}
+
 void FCharaSelectPlayerParam::InitializeStruct()
 {
     CREATE_PROPERTY(int32, FCharaSelectPlayerParam, Cursor,
-                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+                    CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
     CREATE_COMPLEX_PROPERTY(FVector, FCharaSelectPlayerParam, CursorPos,
-                            CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
-                            FString(STR("/Script/CoreUObject.Vector")))
+                            CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                            FString(STR("/Script/CoreUObject.Vector2D")))
     CREATE_PROPERTY(int32, FCharaSelectPlayerParam, RandomCounter,
-                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+                    CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
     CREATE_PROPERTY(bool, FCharaSelectPlayerParam, bRandomSelect,
-                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+                    CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
     CREATE_PROPERTY(int32, FCharaSelectPlayerParam, PrevCursor,
-                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
-    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, SelectColor,
-                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
-    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, SelectChara,
-                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+                    CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    CREATE_COMPLEX_STATIC_ARRAY_PROPERTY(FDecideInfo, FCharaSelectPlayerParam, DecideInfo,
+                            CPF_NativeAccessSpecifierPublic,
+                            FString(STR("/Script/REDExtend.DecideInfo")), 3)
+    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, TeamSelectIndex,
+                    CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    CREATE_PROPERTY(int32, FCharaSelectPlayerParam, CustomCursor,
+                    CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
     CREATE_PROPERTY(bool, FCharaSelectPlayerParam, bSelectCPU,
-                    CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+                    CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
+    CREATE_ENUM_PROPERTY(ECharaState, FCharaSelectPlayerParam, StageID,
+                         CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                         FString(STR("/Script/REDExtend.ECharaState")), uint8)
+    CREATE_ENUM_PROPERTY(EBattleStage, FCharaSelectPlayerParam, StageID,
+                         CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                         FString(STR("/Script/RED.EBattleStage")), uint8)
+    CREATE_ENUM_PROPERTY(EBGMID, FCharaSelectPlayerParam, BGMID,
+                         CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
+                         FString(STR("/Script/RED.EBGMID")), int32)
+    CREATE_PROPERTY(bool, FCharaSelectPlayerParam, bReady,
+                    CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic)
 }
 
 FDynamicClass AREDGameState_CharaSelectRE::Data = {
@@ -70,7 +115,47 @@ void AREDGameState_CharaSelectRE::SetPlayerParam(const int32 Side, FCharaSelectP
 
 void AREDGameState_CharaSelectRE::InitializeWidget()
 {
-    ProcessEvent(GetClassPrivate()->GetFuncMap().FindRef(FName(STR("InitializeWidget"))), nullptr);
+    std::function<UFunction*(UClass*, FName)> FindFunctionByName;
+    FindFunctionByName = [FindFunctionByName](UClass* Class, FName InName) -> UFunction*
+    {
+        auto Result = Class->GetFuncMap().FindRef(InName);
+        if (Result == nullptr)
+        {
+            auto SuperClass = Class->GetSuperClass();
+            if (SuperClass || Class->GetInterfaces().Num() > 0)
+            {
+                bool bFoundInSuperFuncMap = false;
+                {
+                    if (UFunction** SuperResult = Class->GetSuperFuncMap().Find(InName))
+                    {
+                        Result = *SuperResult;
+                        bFoundInSuperFuncMap = true;
+                    }
+                }
+
+                if (!bFoundInSuperFuncMap)
+                {
+                    for (const FImplementedInterface& Inter : Class->GetInterfaces())
+                    {
+                        Result = Inter.Class ? FindFunctionByName(Class, InName) : nullptr;
+                        if (Result)
+                        {
+                            break;
+                        }
+                    }
+
+                    if (SuperClass && Result == nullptr)
+                    {
+                        Result = FindFunctionByName(SuperClass, InName);
+                    }
+
+                    Class->GetSuperFuncMap().Add(InName, Result);
+                }
+            }
+        }
+        return Result;
+    };
+    ProcessEvent(FindFunctionByName(GetClassPrivate(), FName(STR("InitializeWidget"))), nullptr);
 }
 
 void AREDGameState_CharaSelectRE::BeginPlay()
@@ -159,6 +244,8 @@ void AREDGameState_CharaSelectRE::AREDGameState_CharaSelectRE_Ctor(const FObject
     CastContext->InitializeVTable();
 
     CastContext->bStartedOnlineTraining = false;
+    CastContext->PlayerParam[0] = FCharaSelectPlayerParam();
+    CastContext->PlayerParam[1] = FCharaSelectPlayerParam();
 }
 
 void AREDGameState_CharaSelectRE::InitializeClass()
@@ -166,9 +253,9 @@ void AREDGameState_CharaSelectRE::InitializeClass()
     Data.ClassDefaultObjectPath = FString(STR("/Script/REDExtend.Default__REDGameState_CharaSelectRE"));
     Data.SuperStruct = FString(STR("/Script/RED.REDGameState"));
 
-    CREATE_COMPLEX_PROPERTY(FCharaSelectPlayerParam, AREDGameState_CharaSelectRE, PlayerParam,
-                            CPF_Edit | CPF_BlueprintVisible | CPF_NativeAccessSpecifierPublic,
-                            FString(STR("/Script/REDExtend.CharaSelectPlayerParam")))
+    CREATE_COMPLEX_STATIC_ARRAY_PROPERTY(FCharaSelectPlayerParam, AREDGameState_CharaSelectRE, PlayerParam,
+                            CPF_NativeAccessSpecifierPublic,
+                            FString(STR("/Script/REDExtend.CharaSelectPlayerParam")), 2)
     {
         PARAM_BEGIN()
         CREATE_PARAM(const int32, Side, CPF_None)
@@ -187,7 +274,8 @@ void AREDGameState_CharaSelectRE::InitializeClass()
                         FUNC_Public | FUNC_BlueprintCallable | FUNC_BlueprintPure,
                         FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:SetPlayerParam")), Params)
     }
-    CREATE_EVENT(FUNC_BlueprintEvent, FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:InitializeWidget")), {})
+    CREATE_EVENT(FUNC_Public | FUNC_BlueprintEvent,
+                 FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE:InitializeWidget")), {})
 }
 
 void AREDGameState_CharaSelectRE::InitializeVTable()

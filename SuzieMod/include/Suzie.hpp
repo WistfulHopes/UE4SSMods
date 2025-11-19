@@ -1,87 +1,81 @@
 #pragma once
 
-#include "UClass.hpp"
+#include <Unreal/CoreUObject/UObject/Class.hpp>
 #include "FString.hpp"
-#include "Property/FNumericProperty.hpp"
 
 using namespace RC::Unreal;
 
 struct FDynamicProperty
 {
-    EPropertyFlags Flags;
-    FString Name;
-    FString Type;
-    int32 ArrayDim;
-    int32 Offset;
-    FString Class;
-    FString MetaClass;
-    FString Struct;
-    FString Enum;
-    FDynamicProperty* Container;
-    struct FDynamicFunction* SignatureFunction;
-    FDynamicProperty* Inner;
-    FDynamicProperty* Key;
-    FDynamicProperty* Value;
+    EPropertyFlags Flags {};
+    FString Name {};
+    FString Type {};
+    int32 ArrayDim {};
+    int32 Offset {};
+    FString Class {};
+    FString MetaClass {};
+    FString Struct {};
+    FString Enum {};
+    std::shared_ptr<FDynamicProperty> Container {};
+    struct FDynamicFunction* SignatureFunction {};
+    std::shared_ptr<FDynamicProperty> Inner {};
+    std::shared_ptr<FDynamicProperty> Key {};
+    std::shared_ptr<FDynamicProperty> Value {};
 };
 
 struct FDynamicFunction
 {
-    FString Path;
-    void(* Func)(UObject*, FFrame&, void*);
-    EFunctionFlags Flags;
-    TArray<FDynamicProperty> Properties;
+    FString Path {};
+    void(* Func)(UObject*, FFrame&, void*) {};
+    EFunctionFlags Flags {};
+    TArray<FDynamicProperty> Properties {};
 };
 
 struct FDynamicObject
 {
-    FString Path;
-    EObjectFlags Flags;
-};
-
-class FUObjectAllocator
-{
-    char _padding[0x20]{};
+    FString Path {};
+    EObjectFlags Flags {};
 };
 
 class FObjectInitializer
 {
 public:
-    UObject* Obj;
+    UObject* Obj {};
 };
 
 struct FDynamicClass : FDynamicObject
 {
-    FString ClassDefaultObjectPath;
-    FString SuperStruct;
-    TArray<FDynamicProperty> Properties;
-    TArray<FDynamicFunction> Functions;
-    TArray<FDynamicObject> Children;
-    EClassFlags ClassFlags;
-    void (*Ctor)(const FObjectInitializer*);
+    FString ClassDefaultObjectPath {};
+    FString SuperStruct {};
+    TArray<FDynamicProperty> Properties {};
+    TArray<FDynamicFunction> Functions {};
+    TArray<FDynamicObject> Children {};
+    EClassFlags ClassFlags {};
+    void (*Ctor)(const FObjectInitializer*) {};
 };
 
 struct FDynamicScriptStruct : FDynamicObject
 {
-    FString SuperStruct;
-    EStructFlags StructFlags;
-    TArray<FDynamicProperty> Properties;
+    FString SuperStruct {};
+    EStructFlags StructFlags {};
+    TArray<FDynamicProperty> Properties {};
 };
 
 struct FDynamicEnum : FDynamicObject
 {
-    FString CppType;
-    TMap<FString, int64> Pairs;
+    FString CppType {};
+    TMap<FString, int64> Pairs {};
 };
 
 struct FDynamicClassGenerationContext
 {
-    TMap<UClass*, FString> ClassesPendingConstruction;
-    TMap<UClass*, FString> ClassesPendingFinalization;
+    TMap<UClass*, FString> ClassesPendingConstruction {};
+    TMap<UClass*, FString> ClassesPendingFinalization {};
 };
 
 struct FDynamicObjectConstructionData
 {
-    FName ObjectName;
+    FName ObjectName {};
     UClass* ObjectClass{};
     EObjectFlags ObjectFlags{};
 };
@@ -95,13 +89,13 @@ struct FNestedDefaultSubobjectOverrideData
 struct FDynamicClassConstructionData
 {
     // List of properties (not including super class properties) that must be constructed with InitializeValue call
-    TArray<const FProperty*> PropertiesToConstruct;
+    TArray<const FProperty*> PropertiesToConstruct {};
     // Names of default subobjects that our native parent class defines but that we do not want to be created
-    TArray<FName> SuppressedDefaultSubobjects;
+    TArray<FName> SuppressedDefaultSubobjects {};
     // Note that this will also contain all subobjects defined in parent classes
-    TArray<FDynamicObjectConstructionData> DefaultSubobjects;
+    TArray<FDynamicObjectConstructionData> DefaultSubobjects {};
     // Overrides for nested default subobjects. Note that top level subobjects will not be included here
-    TArray<FNestedDefaultSubobjectOverrideData> DefaultSubobjectOverrides;
+    TArray<FNestedDefaultSubobjectOverrideData> DefaultSubobjectOverrides {};
     // Archetype to use for constructing the object when no archetype has been provided or the provided archetype was a CDO
     UObject* DefaultObjectArchetype{};
 };
@@ -128,19 +122,16 @@ public:
     void Initialize();
 
 private:
-    TMap<FString, FDynamicClass*> DynamicClasses;
-    TMap<FString, FDynamicScriptStruct*> DynamicStructs;
-    TMap<FString, FDynamicEnum*> DynamicEnums;
-    TMap<FString, FDynamicFunction*> DynamicFunctions;
+    TMap<FString, FDynamicClass*> DynamicClasses {};
+    TMap<FString, FDynamicScriptStruct*> DynamicStructs {};
+    TMap<FString, FDynamicEnum*> DynamicEnums {};
+    TMap<FString, FDynamicFunction*> DynamicFunctions {};
     
-    RC::Function<UPackage*(UObject*, const TCHAR*)> CreatePackage;
-    RC::Function<FField*(const FName&, const FFieldVariant*, const FName&, uint32)> FField_Construct;
-    RC::Function<UObjectBase*(FUObjectAllocator*, int32, int32, bool)> FUObjectAllocator_AllocateUObject;
+    RC::Function<UPackage*(UObject*, const TCHAR*)> CreatePackage {};
     RC::Function<void*(UClass*, int32, FName, int32, int32, EClassFlags, EClassCastFlags, const TCHAR*, EObjectFlags,
-                       void (*)(const FObjectInitializer*), UObject*(*)(void*), void (*)(UObject*, void*))> UClass_Ctor;
-    RC::Function<TMap<FName, FFieldClass*>()> FFieldClass_GetNameToFieldClassMap;
-    RC::Function<void(UClass*, bool)> UClass_AssembleReferenceTokenStream;
-    RC::Function<void(UStruct*, bool)> UStruct_StaticLink;
+                       void (*)(const FObjectInitializer*), UObject*(*)(void*), void (*)(UObject*, void*))> UClass_Ctor {};
+    RC::Function<TMap<FName, FFieldClass*>()> FFieldClass_GetNameToFieldClassMap {};
+    RC::Function<void(UClass*, bool)> UClass_AssembleReferenceTokenStream {};
 
     UPackage* FindOrCreatePackage(const FString& PackageName);
     UClass* FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Context, const FString& ClassPath);
@@ -167,11 +158,9 @@ private:
     FProperty* BuildProperty(FDynamicClassGenerationContext& Context, FFieldVariant Owner,
                              const FDynamicProperty& Property, EPropertyFlags ExtraPropertyFlags = CPF_None);
 
-    int32 SetupPropertyOffset(FProperty* Context, const FDynamicProperty& Property);
     UScriptStruct* GetSparseClassDataArchetypeStruct(UClass* Context);
 
     void Create();
     
     static inline Suzie* Instance;
-    static inline FUObjectAllocator* GUObjectAllocator;
 };

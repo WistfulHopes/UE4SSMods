@@ -9,7 +9,6 @@
 #include "REDGameState.h"
 #include "REDGameState_CharaSelectRE.h"
 #include "UE4SSProgram.hpp"
-#include "UFunction.hpp"
 #include "SigScanner/SinglePassSigScanner.hpp"
 
 namespace GGSTMods
@@ -29,7 +28,7 @@ namespace GGSTMods
             ModVersion = STR("0.1");
             ModName = STR("GGSTUIRemake");
             ModAuthors = STR("UE4SS");
-            ModDescription = STR("Code behind for GGST UI remake");
+            ModDescription = STR("Backend code for GGST UI remake");
         }
 
         // destructor
@@ -70,6 +69,18 @@ namespace GGSTMods
                 {
                 },
             };
+            const SignatureContainer QuadrantManager_GetInstance{
+                {{"E8 ? ? ? ? 49 8D 8E ? ? ? ? C7 40 ? 04 00 00 00"}},
+                [&](const SignatureContainer& self)
+                {
+                    auto func_addr = (uintptr_t)self.get_match_address() + 0x5 + (uintptr_t)*(uint32*)(self.
+                        get_match_address() + 0x1);
+                    return true;
+                },
+                [](SignatureContainer& self)
+                {
+                },
+            };
 
             std::vector<SignatureContainer> signature_containers;
             signature_containers.push_back(OnStartedLobbyTraining);
@@ -80,22 +91,26 @@ namespace GGSTMods
 
             SinglePassScanner::start_scan(signature_containers_map);
         }
-        
+
         auto on_unreal_init() -> void override
         {
             get_signatures();
-            
+
             AREDGameState_CharaSelectRE::InitializeClass();
             AREDGameMode_CharaSelectRE::InitializeClass();
+            FDecideInfo::InitializeStruct();
             FCharaSelectPlayerParam::InitializeStruct();
+            ECharaState_InitializeEnum();
 
             if (const auto Suzie = LoadLibrary(STR("./ue4ss/Mods/SuzieMod/dlls/main.dll")))
             {
                 typedef int (*InsertClass_t)(FString, FDynamicClass*);
                 if (const auto InsertClass = reinterpret_cast<InsertClass_t>(GetProcAddress(Suzie, "InsertClass")))
                 {
-                    InsertClass(FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE")), &AREDGameState_CharaSelectRE::Data);
-                    InsertClass(FString(STR("/Script/REDExtend.REDGameMode_CharaSelectRE")), &AREDGameMode_CharaSelectRE::Data);
+                    InsertClass(FString(STR("/Script/REDExtend.REDGameState_CharaSelectRE")),
+                                &AREDGameState_CharaSelectRE::Data);
+                    InsertClass(FString(STR("/Script/REDExtend.REDGameMode_CharaSelectRE")),
+                                &AREDGameMode_CharaSelectRE::Data);
                 }
                 else
                 {
@@ -105,11 +120,22 @@ namespace GGSTMods
                 typedef int (*InsertStruct_t)(FString, FDynamicScriptStruct*);
                 if (const auto InsertStruct = reinterpret_cast<InsertStruct_t>(GetProcAddress(Suzie, "InsertStruct")))
                 {
-                    InsertStruct(FString(STR("/Script/REDExtend.CharaSelectPlayerParam")), &FCharaSelectPlayerParam::Data);
+                    InsertStruct(FString(STR("/Script/REDExtend.DecideInfo")), &FDecideInfo::Data);
+                    InsertStruct(FString(STR("/Script/REDExtend.CharaSelectPlayerParam")),
+                                 &FCharaSelectPlayerParam::Data);
                 }
                 else
                 {
                     Output::send<LogLevel::Error>(STR("Failed to find InsertClass!"));
+                }
+                typedef int (*InsertEnum_t)(FString, FDynamicEnum*);
+                if (const auto InsertEnum = reinterpret_cast<InsertEnum_t>(GetProcAddress(Suzie, "InsertEnum")))
+                {
+                    InsertEnum(FString(STR("/Script/REDExtend.ECharaState")), &ECharaState_Data);
+                }
+                else
+                {
+                    Output::send<LogLevel::Error>(STR("Failed to find InsertEnum!"));
                 }
             }
             else
@@ -127,13 +153,13 @@ namespace GGSTMods
 #define GGSTUIREMAKE_EXPORT __declspec(dllexport)
 
 extern "C" {
-    GGSTUIREMAKE_EXPORT RC::CppUserModBase* start_mod()
-    {
-        return new GGSTMods::GGSTUIRemake();
-    }
+GGSTUIREMAKE_EXPORT RC::CppUserModBase* start_mod()
+{
+    return new GGSTMods::GGSTUIRemake();
+}
 
-    GGSTUIREMAKE_EXPORT void uninstall_mod(RC::CppUserModBase* mod)
-    {
-        delete mod;
-    }
+GGSTUIREMAKE_EXPORT void uninstall_mod(RC::CppUserModBase* mod)
+{
+    delete mod;
+}
 }

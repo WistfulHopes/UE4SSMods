@@ -11,45 +11,70 @@ using namespace RC::Unreal;
 using CharType = wchar_t;
 using StringType = std::basic_string<CharType>;
 
+enum ECharaState
+{
+    CharaState_First,
+    CharaState_Second,
+    CharaState_Third,
+    CharaState_ColorCostume,
+    CharaState_Ready,
+};
+
+extern FDynamicEnum ECharaState_Data;
+void ECharaState_InitializeEnum();
+
 struct FDecideInfo
 {
-    int CharaID;
-    int ColorID;
-    int CostumeID;
-    int ScriptID;
-    int StageID;
-    int BGMID;
-    int SpFlag;
-    int SkillSetIndex;
+    TEnumAsByte<ECharaID> CharaID{};
+    TEnumAsByte<EColorID> ColorID{};
+    TEnumAsByte<ECostumeID> CostumeID{};
+    TEnumAsByte<EBattleScript> ScriptID{};
+    uint8 SpFlag{};
+    int32 SkillSetIndex{};
+    
+    static void InitializeStruct();
+    
+    static inline FDynamicScriptStruct Data;
 };
 
 struct FSideInfo
 {
-    SIDE_ID SideID;
-    PAD_ID ControlPad;
-    FDecideInfo DecideInfo;
-    bool bSelectCPUChara;
-    int32 Page;
+    SIDE_ID SideID{};
+    PAD_ID ControlPad{};
+    FDecideInfo DecideInfo{};
+    bool bSelectCPUChara{};
+    int32 Page{};
 };
 
 struct FDecideInfoHistory
 {
-    FDecideInfo CharaHistory1P;
-    FDecideInfo CharaHistory2P;
-    bool IsValid;
-    SIDE_ID MainSide;
+    FDecideInfo CharaHistory1P{};
+    FDecideInfo CharaHistory2P{};
+    bool IsValid{};
+    SIDE_ID MainSide{};
+};
+
+struct FVector2D_Old
+{
+    float X;
+    float Y;
 };
 
 struct FCharaSelectPlayerParam
 {
-    int32 Cursor;
-    FVector CursorPos;
-    int32 RandomCounter;
-    bool bRandomSelect;
-    int32 PrevCursor;
-    int32 SelectColor;
-    int32 SelectChara;
-    bool bSelectCPU;
+    int32 Cursor{};
+    FVector2D_Old CursorPos{};
+    int32 RandomCounter{};
+    bool bRandomSelect{};
+    int32 PrevCursor{};
+    FDecideInfo DecideInfo[3]{};
+    int TeamSelectIndex{};
+    int CustomCursor{};
+    bool bSelectCPU{};
+    TEnumAsByte<ECharaState> State{};
+    TEnumAsByte<EBattleStage> StageID = BATTLE_STAGE_AUTO;
+    EBGMID BGMID = EBGMID::BGMID_AUTO;
+    bool bReady{};
 
     static void InitializeStruct();
     

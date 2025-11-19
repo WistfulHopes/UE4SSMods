@@ -45,7 +45,8 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
     {
         return STR("BoolProperty");
     }
-    return STR("Property");
+    static_assert("Unknown property type detected!");
+    return STR("Unknown");
 }
 
 #define CALL_BASE_CTOR()                                                                    \
@@ -116,6 +117,28 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Data.Properties.Add(Property);                                                              \
     }
 
+#define CREATE_ENUM_PROPERTY(TypeName, ClassName, MemberName, InFlags, ScriptPath, UnderlyingType)  \
+    {                                                                                               \
+        PROPERTY_FLAGS(TypeName)                                                                    \
+        auto ContainerProperty = std::make_shared<FDynamicProperty>();                              \
+        ContainerProperty->Flags = Flags;                                                           \
+        ContainerProperty->Name = FString(STR("UnderlyingType"));                                   \
+        GET_PROPERTY_NAME(UnderlyingType)                                                           \
+        ContainerProperty->Type = PropertyName;                                                     \
+        ContainerProperty->ArrayDim = 1;                                                            \
+        Flags |= InFlags;                                                                           \
+        auto Property = FDynamicProperty {                                                          \
+            .Flags = Flags,                                                                         \
+            .Name = FString(STR(#MemberName)),                                                      \
+            .ArrayDim = 1,                                                                          \
+            .Offset = offsetof(ClassName, MemberName),                                              \
+            .Enum = ScriptPath,                                                                     \
+            .Container = ContainerProperty,                                                         \
+        };                                                                                          \
+        Property.Type = FString(STR("EnumProperty"));                                               \
+        Data.Properties.Add(Property);                                                              \
+    }
+
 #define CREATE_COMPLEX_PROPERTY(TypeName, ClassName, MemberName, InFlags, ScriptPath)               \
     {                                                                                               \
         PROPERTY_FLAGS(TypeName)                                                                    \
@@ -141,7 +164,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Data.Properties.Add(Property);                                                              \
     }
 
-#define CREATE_ARRAY_PROPERTY(TypeName, ClassName, MemberName, InFlags, InArrayDim)                 \
+#define CREATE_STATIC_ARRAY_PROPERTY(TypeName, ClassName, MemberName, InFlags, InArrayDim)          \
     {                                                                                               \
         PROPERTY_FLAGS(TypeName)                                                                    \
         Flags |= InFlags;                                                                           \
@@ -156,29 +179,29 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         Data.Properties.Add(Property);                                                              \
     }
 
-#define CREATE_COMPLEX_ARRAY_PROPERTY(TypeName, ClassName, MemberName, InFlags, ScriptPath, InArrayDim) \
-    {                                                                                                   \
-        PROPERTY_FLAGS(TypeName)                                                                        \
-        Flags |= InFlags;                                                                               \
-        auto Property = FDynamicProperty {                                                              \
-            .Flags = Flags,                                                                             \
-            .Name = FString(STR(#MemberName)),                                                          \
-            .ArrayDim = InArrayDim,                                                                     \
-            .Offset = offsetof(ClassName, MemberName),                                                  \
-        };                                                                                              \
-        {                                                                                               \
-            GET_PROPERTY_NAME(TypeName)                                                                 \
-            Property.Type = PropertyName;                                                               \
-        }                                                                                               \
-        {                                                                                               \
-            IS_OBJECT_PROPERTY(TypeName)                                                                \
-            if (IsObjectProperty)                                                                       \
-                Property.Class = ScriptPath;                                                            \
-            IS_STRUCT_PROPERTY(TypeName)                                                                \
-            if (IsStructProperty)                                                                       \
-                Property.Struct = ScriptPath;                                                           \
-        }                                                                                               \
-        Data.Properties.Add(Property);                                                                  \
+#define CREATE_COMPLEX_STATIC_ARRAY_PROPERTY(TypeName, ClassName, MemberName, InFlags, ScriptPath, InArrayDim)  \
+    {                                                                                                           \
+        PROPERTY_FLAGS(TypeName)                                                                                \
+        Flags |= InFlags;                                                                                       \
+        auto Property = FDynamicProperty {                                                                      \
+            .Flags = Flags,                                                                                     \
+            .Name = FString(STR(#MemberName)),                                                                  \
+            .ArrayDim = InArrayDim,                                                                             \
+            .Offset = offsetof(ClassName, MemberName),                                                          \
+        };                                                                                                      \
+        {                                                                                                       \
+            GET_PROPERTY_NAME(TypeName)                                                                         \
+            Property.Type = PropertyName;                                                                       \
+        }                                                                                                       \
+        {                                                                                                       \
+            IS_OBJECT_PROPERTY(TypeName)                                                                        \
+            if (IsObjectProperty)                                                                               \
+                Property.Class = ScriptPath;                                                                    \
+            IS_STRUCT_PROPERTY(TypeName)                                                                        \
+            if (IsStructProperty)                                                                               \
+                Property.Struct = ScriptPath;                                                                   \
+        }                                                                                                       \
+        Data.Properties.Add(Property);                                                                          \
     }
 
 #define CREATE_FUNCTION(ClassName, FuncName, InFlags, ScriptPath, Params)       \
@@ -186,7 +209,7 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
         auto Function = FDynamicFunction {                                      \
             .Path = ScriptPath,                                                 \
             .Func = &ClassName::FuncName,                                       \
-            .Flags = InFlags,                                                   \
+            .Flags = FUNC_Native | InFlags,                                     \
             .Properties = Params,                                               \
         };                                                                      \
         Data.Functions.Add(Function);                                           \
