@@ -130,7 +130,6 @@ private:
     RC::Function<UPackage*(UObject*, const TCHAR*)> CreatePackage {};
     RC::Function<void*(UClass*, int32, FName, int32, int32, EClassFlags, EClassCastFlags, const TCHAR*, EObjectFlags,
                        void (*)(const FObjectInitializer*), UObject*(*)(void*), void (*)(UObject*, void*))> UClass_Ctor {};
-    RC::Function<TMap<FName, FFieldClass*>()> FFieldClass_GetNameToFieldClassMap {};
     RC::Function<void(UClass*, bool)> UClass_AssembleReferenceTokenStream {};
 
     UPackage* FindOrCreatePackage(const FString& PackageName);

@@ -94,7 +94,7 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
 
     // Bind parent class to this class and link properties to calculate their runtime derived data
     NewClass->Bind();
-    NewClass->Link(*(FArchive*)EmptyPropertyLinkArchive, false);
+    NewClass->Link(*(FArchive*)EmptyPropertyLinkArchive, true);
     NewClass->GetSparseClassDataStruct() = GetSparseClassDataArchetypeStruct(NewClass);
 
     FMemory::Free(EmptyPropertyLinkArchive);
@@ -483,21 +483,6 @@ void Suzie::Initialize()
         {
         },
     };
-    const SignatureContainer FFieldClass_GetNameToFieldClassMap_Sig{
-        {
-            {
-                "48 83 EC ? 65 48 8B 04 25 ? ? ? ? 8B 0D ? ? ? ? BA ? ? ? ? 48 8B 0C C8 8B 04 0A 39 05 ? ? ? ? 7F ? 48 8D 05 ? ? ? ? 48 83 C4 ? C3 48 8D 0D ? ? ? ? E8 ? ? ? ? 83 3D ? ? ? ? ? 75 ? 33 C0 C7 05 ? ? ? ? ? ? ? ? 48 8D 0D ? ? ? ? 48 89 05 ? ? ? ? 48 89 05 ? ? ? ? 48 89 05 ? ? ? ? 89 05 ? ? ? ? 48 89 05 ? ? ? ? 48 89 05 ? ? ? ? 89 05 ? ? ? ? 48 89 05 ? ? ? ? 89 05 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? E8 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC 48 89 5C 24"
-            }
-        },
-        [&](const SignatureContainer& self)
-        {
-            FFieldClass_GetNameToFieldClassMap.assign_address(self.get_match_address());
-            return true;
-        },
-        [](SignatureContainer& self)
-        {
-        },
-    };
     const SignatureContainer UClass_AssembleReferenceTokenStream_sig{
         {{"48 8B C4 55 56 48 8D 68 ? 48 81 EC ? ? ? ? 48 89 58 ? 48 8D B1"}},
         [&](const SignatureContainer& self)
@@ -523,7 +508,6 @@ void Suzie::Initialize()
 
     std::vector<SignatureContainer> signature_containers;
     signature_containers.push_back(CreatePackage_Sig);
-    signature_containers.push_back(FFieldClass_GetNameToFieldClassMap_Sig);
     signature_containers.push_back(UClass_AssembleReferenceTokenStream_sig);
     signature_containers.push_back(UClass_Ctor_Sig);
 
@@ -713,17 +697,17 @@ FProperty* Suzie::AddPropertyToStruct(FDynamicClassGenerationContext& Context, U
     if (FProperty* NewProperty = BuildProperty(Context, Struct, Property, ExtraPropertyFlags))
     {
         // This property will always be linked as a last element of the list, so it has no next element
-        NewProperty->GetNext() = nullptr;
+        NewProperty->SetNext((FField*)nullptr);
 
         // Link new property to the end of the linked property list
         if (Struct->GetChildProperties() != nullptr)
         {
             FField* CurrentProperty = Struct->GetChildProperties();
-            while (CurrentProperty->GetNext())
+            while (CurrentProperty->GetNextFieldAsProperty())
             {
-                CurrentProperty = CurrentProperty->GetNext();
+                CurrentProperty = CurrentProperty->GetNextFieldAsProperty();
             }
-            CurrentProperty->GetNext() = NewProperty;
+            CurrentProperty->SetNext(NewProperty);
         }
         else
         {
@@ -862,7 +846,7 @@ FProperty* Suzie::BuildProperty(FDynamicClassGenerationContext& Context, FFieldV
     }
     else if (FFieldPathProperty* FieldPathProperty = CastField<FFieldPathProperty>(NewProperty))
     {
-        FFieldClass* const* PropertyClassPtr = FFieldClass_GetNameToFieldClassMap().Find(
+        FFieldClass* const* PropertyClassPtr = FFieldClass::GetNameToFieldClassMap().Find(
             FName(STR("property_class"), FNAME_Add));
         // Fall back to FProperty if property class could not be found
         FieldPathProperty->GetPropertyClass() = PropertyClassPtr ? *PropertyClassPtr : nullptr;
