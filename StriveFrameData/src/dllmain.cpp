@@ -229,6 +229,7 @@ funcUpdateReplay_t orig_UpdateReplay;
 funcSaveBackup_t orig_SaveBackup;
 funcRollback_t orig_Rollback;
 funcGetReplayManager_t orig_GetReplayManager;
+uintptr_t orig_GetNowKeyMappingBattle;
 
 // State Data
 UE4SSProgram* Program;
@@ -774,18 +775,15 @@ void hook_UpdateBattleInput(asw_inputs* Analyzer, RECFLG_ENUM recFlag)
         return;
     }
 
-    const auto module = GetModuleHandleA(NULL);
-
-    // Value is from KeyConfig2GKF, the final if/else set, first function call
-
-    auto bak = *((uint8_t*)module + 0x4fa4713);
-    *((uint8_t*)module + 0x4fa4713) = 1;
+    auto is_battle = (uint8_t*)(*(uint32_t*)(orig_GetNowKeyMappingBattle + 0x3) + orig_GetNowKeyMappingBattle + 0x7);
+    auto bak = *is_battle;
+    *is_battle = 1;
 
     auto pad = game_state.getMainQuadrant();
     auto gameKeyFlag = static_cast<GAMEKEY_FLAG>(system_red->m_BattleKey[pad]->m_PureKey);
     auto newRecflag = orig_GameKeyToRecFlag(pad, gameKeyFlag, false);
 
-    *((uint8_t*)module + 0x4fa4713) = bak;
+    *is_battle = bak;
     orig_UpdateBattleInput(Analyzer, newRecflag);
 }
 
@@ -911,6 +909,11 @@ public:
             "\x48\x8D\x05\x00\x00\x00\x00\xC3\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xCC\x48\x63\xC1",
             "xxx????xxxxxxxxxxxx");
         orig_GetReplayManager = reinterpret_cast<funcGetReplayManager_t>(GetReplayManager_Addr);
+
+        const uintptr_t GetNowKeyMappingBattle_Addr = sigscan::get().scan(
+            "\xE8\x00\x00\x00\x00\x84\xC0\x75\x00\xE8\x00\x00\x00\x00\x84\xC0\x75\x00\x48\x8B\xCF\x48\x8D\x14\x5B\x48\x03\x0D\x00\x00\x00\x00\x0F\xB6\x8C\xD1",
+            "x????xxx?x????xxx?xxxxxxxxxx????xxxx");
+        orig_GetNowKeyMappingBattle = *reinterpret_cast<uint32_t*>(GetNowKeyMappingBattle_Addr + 0x1) + GetNowKeyMappingBattle_Addr + 0x5;
 
         replay_manager.setManager(reinterpret_cast<ReplayManager_Internal*>(orig_GetReplayManager() - 0x8));
 
