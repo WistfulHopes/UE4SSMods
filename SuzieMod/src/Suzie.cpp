@@ -482,35 +482,13 @@ UPackage* Suzie::FindOrCreatePackage(const FString& PackageName)
     return Package;
 }
 
-UClass* Suzie::FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Context, const FString& ClassPath)
+UClass* Suzie::UClass_Ctor(UClass* ParentClass, EClassFlags ClassFlags)
 {
-    // Attempt to find an existing class first
-    if (UClass* ExistingClass = UObjectGlobals::StaticFindObject<UClass*>(nullptr, nullptr, *ClassPath))
-    {
-        return ExistingClass;
-    }
-
-    const auto Class = DynamicClasses[ClassPath];
-
-    const FString ParentClassPath = Class->SuperStruct;
-    UClass* ParentClass = FindOrCreateClass(Context, ParentClassPath);
-    if (!ParentClass)
-    {
-        return nullptr;
-    }
-
-    FString PackageName;
-    FString ClassName;
-    ParseObjectPath(ClassPath, PackageName, ClassName);
-
-    // DeferredRegister for UClass will automatically find the package by name, but we should still prime it before that
-    FindOrCreatePackage(PackageName);
-
-    EClassFlags ClassFlags = CLASS_Native | CLASS_Intrinsic | Class->ClassFlags;
+    EClassFlags ClassFlags = CLASS_Native | CLASS_Intrinsic | ClassFlags;
 
     auto ConstructedClassObject = static_cast<UClass*>(UObjectBase::AllocateUObject(
         UClass::StaticClass()->GetStructureSize(), UClass::StaticClass()->GetMinAlignment(), true));
-    
+
     *(uintptr_t*)ConstructedClassObject = *(uintptr_t*)UClass::StaticClass();
     ConstructedClassObject->GetPropertiesSize() = ParentClass->GetStructureSize();
     ConstructedClassObject->GetMinAlignment() = ParentClass->GetMinAlignment();
@@ -538,7 +516,7 @@ UClass* Suzie::FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Con
     {
         ConstructedClassObject->GetClassGeneratedBy() = nullptr;
     }
-    else 
+    else
     {
         ConstructedClassObject->GetbLayoutChanging() = false;
     }
@@ -560,6 +538,37 @@ UClass* Suzie::FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Con
     ConstructedClassObject->GetDestructorLink() = nullptr;
     ConstructedClassObject->GetPostConstructLink() = nullptr;
     ConstructedClassObject->GetNext() = nullptr;
+
+    return ConstructedClassObject;
+}
+
+UClass* Suzie::FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Context, const FString& ClassPath)
+{
+    // Attempt to find an existing class first
+    if (UClass* ExistingClass = UObjectGlobals::StaticFindObject<UClass*>(nullptr, nullptr, *ClassPath))
+    {
+        return ExistingClass;
+    }
+
+    const auto Class = DynamicClasses[ClassPath];
+
+    const FString ParentClassPath = Class->SuperStruct;
+    UClass* ParentClass = FindOrCreateClass(Context, ParentClassPath);
+    if (!ParentClass)
+    {
+        return nullptr;
+    }
+
+    FString PackageName;
+    FString ClassName;
+    ParseObjectPath(ClassPath, PackageName, ClassName);
+
+    // DeferredRegister for UClass will automatically find the package by name, but we should still prime it before that
+    FindOrCreatePackage(PackageName);
+
+    EClassFlags ClassFlags = CLASS_Native | CLASS_Intrinsic | Class->ClassFlags;
+
+    UClass* ConstructedClassObject = UClass_Ctor(ParentClass, ClassFlags);
 
     //Set super structure and ClassWithin (they are required prior to registering)
     ConstructedClassObject->SetSuperStruct(ParentClass);

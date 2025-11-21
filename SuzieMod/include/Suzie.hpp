@@ -136,6 +136,8 @@ private:
     UEnum* FindOrCreateEnum(FDynamicClassGenerationContext& Context, const FString& EnumPath);
     UFunction* FindOrCreateFunction(FDynamicClassGenerationContext& Context, const FDynamicFunction& Function);
     UFunction* FindOrCreateFunction(FDynamicClassGenerationContext& Context, const FString& FunctionPath);
+
+    UClass* UClass_Ctor(UClass* ParentClass, EClassFlags ClassFlags);
     
     bool ParseObjectConstructionData(const FDynamicClassGenerationContext& Context, const FString& ObjectPath, FDynamicObjectConstructionData& ObjectConstructionData);
     void CollectNestedDefaultSubobjectTypeOverrides(FDynamicClassGenerationContext& Context,
