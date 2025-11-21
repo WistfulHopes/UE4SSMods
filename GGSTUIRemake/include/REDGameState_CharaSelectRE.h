@@ -107,7 +107,7 @@ public:
 public:
     AActor* GetHUD();
     
-    static void AREDGameState_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer);
+    static void AREDGameState_CharaSelectRE_Ctor(const SuzieNamespace::FObjectInitializer* ObjectInitializer);
     static void InitializeClass();
     void InitializeVTable();
 

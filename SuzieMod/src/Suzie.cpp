@@ -1,10 +1,7 @@
 #include "Suzie.hpp"
 
-#include <Unreal/CoreUObject/UObject/UnrealType.hpp>
 #include <Unreal/Property/FEnumProperty.hpp>
 #include <Unreal/Property/FFieldPathProperty.hpp>
-#include "SigScanner/SinglePassSigScanner.hpp"
-#include "UActorComponent.hpp"
 #include "UInterface.hpp"
 #include "UPackage.hpp"
 
@@ -95,7 +92,10 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
     // Bind parent class to this class and link properties to calculate their runtime derived data
     NewClass->Bind();
     NewClass->Link(*(FArchive*)EmptyPropertyLinkArchive, true);
-    NewClass->GetSparseClassDataStruct() = GetSparseClassDataArchetypeStruct(NewClass);
+    if (Unreal::Version::IsAtLeast(4, 24))
+    {
+        NewClass->GetSparseClassDataStruct() = GetSparseClassDataArchetypeStruct(NewClass);
+    }
 
     FMemory::Free(EmptyPropertyLinkArchive);
     FMemory::Free(vtbl);
@@ -472,56 +472,12 @@ Suzie* Suzie::GetInstance()
 
 void Suzie::Initialize()
 {
-    const SignatureContainer CreatePackage_Sig{
-        {{"48 8B C4 48 89 48 ? 55 53 48 8D 68 ? 48 81 EC ? ? ? ? 48 89 78 ? 48 8B FA"}},
-        [&](const SignatureContainer& self)
-        {
-            CreatePackage.assign_address(self.get_match_address());
-            return true;
-        },
-        [](SignatureContainer& self)
-        {
-        },
-    };
-    const SignatureContainer UClass_AssembleReferenceTokenStream_sig{
-        {{"48 8B C4 55 56 48 8D 68 ? 48 81 EC ? ? ? ? 48 89 58 ? 48 8D B1"}},
-        [&](const SignatureContainer& self)
-        {
-            UClass_AssembleReferenceTokenStream.assign_address(self.get_match_address());
-            return true;
-        },
-        [](SignatureContainer& self)
-        {
-        },
-    };
-    const SignatureContainer UClass_Ctor_Sig{
-        {{"48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 8B 84 24 ? ? ? ? 45 8B C1"}},
-        [&](const SignatureContainer& self)
-        {
-            UClass_Ctor.assign_address(self.get_match_address());
-            return true;
-        },
-        [](SignatureContainer& self)
-        {
-        },
-    };
-
-    std::vector<SignatureContainer> signature_containers;
-    signature_containers.push_back(CreatePackage_Sig);
-    signature_containers.push_back(UClass_AssembleReferenceTokenStream_sig);
-    signature_containers.push_back(UClass_Ctor_Sig);
-
-    SinglePassScanner::SignatureContainerMap signature_containers_map;
-    signature_containers_map.emplace(ScanTarget::MainExe, signature_containers);
-
-    SinglePassScanner::start_scan(signature_containers_map);
-
     Create();
 }
 
 UPackage* Suzie::FindOrCreatePackage(const FString& PackageName)
 {
-    UPackage* Package = CreatePackage(nullptr, *PackageName);
+    UPackage* Package = UObjectGlobals::NewObject<UPackage>(nullptr, FName(*PackageName, FNAME_Add));
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(Package) + 0x50) = 0x10;
     return Package;
 }
@@ -554,20 +510,56 @@ UClass* Suzie::FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Con
 
     auto ConstructedClassObject = static_cast<UClass*>(UObjectBase::AllocateUObject(
         UClass::StaticClass()->GetStructureSize(), UClass::StaticClass()->GetMinAlignment(), true));
-    UClass_Ctor(ConstructedClassObject,
-                0,
-                FName(*ClassName, FNAME_Add),
-                ParentClass->GetStructureSize(),
-                ParentClass->GetMinAlignment(),
-                ClassFlags,
-                CASTCLASS_None,
-                STR("Engine"),
-                static_cast<EObjectFlags>(RF_Public | RF_MarkAsNative | RF_MarkAsRootSet),
-                Class->Ctor,
-                [](void*) -> UObject* { return nullptr; },
-                [](UObject*, void*)
-                {
-                });
+    
+    *(uintptr_t*)ConstructedClassObject = *(uintptr_t*)UClass::StaticClass();
+    ConstructedClassObject->GetPropertiesSize() = ParentClass->GetStructureSize();
+    ConstructedClassObject->GetMinAlignment() = ParentClass->GetMinAlignment();
+    ConstructedClassObject->GetClassFlags() = ClassFlags;
+    ConstructedClassObject->GetClassCastFlags() = CASTCLASS_None;
+    ConstructedClassObject->GetClassConfigName() = FName(STR("Engine"), FNAME_Add);
+    ConstructedClassObject->GetObjectFlags() = static_cast<EObjectFlags>(RF_Public | RF_MarkAsNative | RF_MarkAsRootSet);
+    std::function<void(const void*)>* Ctor = new std::function((void(*)(const void*))Class->Ctor);
+    ConstructedClassObject->GetClassConstructor() = Ctor;
+    std::function<UObject* (void*)>* VTableHelperCtorCaller = new std::function([](void*) -> UObject* { return nullptr; });
+    ConstructedClassObject->GetClassVTableHelperCtorCaller() = VTableHelperCtorCaller;
+
+    if (Unreal::Version::IsAtLeast(4, 24))
+    {
+        ConstructedClassObject->GetSparseClassData() = nullptr;
+        ConstructedClassObject->GetSparseClassDataStruct() = nullptr;
+    }
+
+    if (Unreal::Version::IsAtLeast(4, 25))
+    {
+        ConstructedClassObject->GetUnresolvedScriptProperties() = nullptr;
+    }
+
+    if (Unreal::Version::IsBelow(5, 0))
+    {
+        ConstructedClassObject->GetClassGeneratedBy() = nullptr;
+    }
+    else 
+    {
+        ConstructedClassObject->GetbLayoutChanging() = false;
+    }
+
+    if (Unreal::Version::IsBelow(5, 1))
+    {
+        std::function<void(UObject*, void*)>* ClassAddReferencedObjects = new std::function([](UObject*, void*) {});
+        ConstructedClassObject->GetClassAddReferencedObjects() = ClassAddReferencedObjects;
+    }
+
+    ConstructedClassObject->GetClassUnique() = 0;
+    ConstructedClassObject->GetbCooked() = false;
+    ConstructedClassObject->GetNetFields() = {};
+    ConstructedClassObject->GetClassDefaultObject() = nullptr;
+    ConstructedClassObject->GetChildren() = nullptr;
+    ConstructedClassObject->GetChildProperties() = nullptr;
+    ConstructedClassObject->GetPropertyLink() = nullptr;
+    ConstructedClassObject->GetRefLink() = nullptr;
+    ConstructedClassObject->GetDestructorLink() = nullptr;
+    ConstructedClassObject->GetPostConstructLink() = nullptr;
+    ConstructedClassObject->GetNext() = nullptr;
 
     //Set super structure and ClassWithin (they are required prior to registering)
     ConstructedClassObject->SetSuperStruct(ParentClass);
@@ -660,10 +652,9 @@ void Suzie::FinalizeClass(FDynamicClassGenerationContext& Context, UClass* Class
     }
 
     // Assemble reference token stream for garbage collector
-    UClass_AssembleReferenceTokenStream(Class, true);
+    Class->AssembleReferenceTokenStream(true);
     // Create class default object now that we have class object construction data
-    // UClass::CreateDefaultObject
-    (*reinterpret_cast<UObject*(**)(UClass*)>(*reinterpret_cast<uintptr_t*>(Class) + 0x390))(Class);
+    Class->CreateDefaultObject();
 }
 
 void Suzie::ParseObjectPath(const FString& ObjectPath, FString& OutOuterObjectPath, FString& OutObjectName)
@@ -749,7 +740,7 @@ void Suzie::AddFunctionToClass(FDynamicClassGenerationContext& Context, UClass* 
         }
 
         // Add the function to the function lookup for the class
-        Class->GetFuncMap().Add(FName(NewFunction->GetName(), FNAME_Add), NewFunction);
+        Class->GetFuncMap().Add(FName(NewFunction->GetName(), FNAME_Add), TObjectPtr(NewFunction));
 
         Output::send<LogLevel::Verbose>(
             std::format(STR("Added function {} to class {}\n"), NewFunction->GetName(), Class->GetName()));

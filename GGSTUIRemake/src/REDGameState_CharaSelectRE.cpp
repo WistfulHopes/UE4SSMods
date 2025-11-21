@@ -115,47 +115,7 @@ void AREDGameState_CharaSelectRE::SetPlayerParam(const int32 Side, FCharaSelectP
 
 void AREDGameState_CharaSelectRE::InitializeWidget()
 {
-    std::function<UFunction*(UClass*, FName)> FindFunctionByName;
-    FindFunctionByName = [FindFunctionByName](UClass* Class, FName InName) -> UFunction*
-    {
-        auto Result = Class->GetFuncMap().FindRef(InName);
-        if (Result == nullptr)
-        {
-            auto SuperClass = Class->GetSuperClass();
-            if (SuperClass || Class->GetInterfaces().Num() > 0)
-            {
-                bool bFoundInSuperFuncMap = false;
-                {
-                    if (UFunction** SuperResult = Class->GetSuperFuncMap().Find(InName))
-                    {
-                        Result = *SuperResult;
-                        bFoundInSuperFuncMap = true;
-                    }
-                }
-
-                if (!bFoundInSuperFuncMap)
-                {
-                    for (const FImplementedInterface& Inter : Class->GetInterfaces())
-                    {
-                        Result = Inter.Class ? FindFunctionByName(Class, InName) : nullptr;
-                        if (Result)
-                        {
-                            break;
-                        }
-                    }
-
-                    if (SuperClass && Result == nullptr)
-                    {
-                        Result = FindFunctionByName(SuperClass, InName);
-                    }
-
-                    Class->GetSuperFuncMap().Add(InName, Result);
-                }
-            }
-        }
-        return Result;
-    };
-    ProcessEvent(FindFunctionByName(GetClassPrivate(), FName(STR("InitializeWidget"))), nullptr);
+    ProcessEvent(GetClassPrivate()->GetFunctionByNameInChain(FName(STR("InitializeWidget"))), nullptr);
 }
 
 void AREDGameState_CharaSelectRE::BeginPlay()
@@ -235,7 +195,7 @@ AActor* AREDGameState_CharaSelectRE::GetHUD()
     UE_RETURN_PROPERTY(AActor*)
 }
 
-void AREDGameState_CharaSelectRE::AREDGameState_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer)
+void AREDGameState_CharaSelectRE::AREDGameState_CharaSelectRE_Ctor(const SuzieNamespace::FObjectInitializer* ObjectInitializer)
 {
     CALL_BASE_CTOR()
 

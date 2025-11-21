@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Unreal/CoreUObject/UObject/Class.hpp>
-#include "FString.hpp"
 
 using namespace RC::Unreal;
 
@@ -37,11 +36,14 @@ struct FDynamicObject
     EObjectFlags Flags {};
 };
 
-class FObjectInitializer
+namespace SuzieNamespace
 {
-public:
-    UObject* Obj {};
-};
+    class FObjectInitializer
+    {
+    public:
+        UObject* Obj {};
+    };
+}
 
 struct FDynamicClass : FDynamicObject
 {
@@ -51,7 +53,7 @@ struct FDynamicClass : FDynamicObject
     TArray<FDynamicFunction> Functions {};
     TArray<FDynamicObject> Children {};
     EClassFlags ClassFlags {};
-    void (*Ctor)(const FObjectInitializer*) {};
+    void (*Ctor)(const SuzieNamespace::FObjectInitializer*) {};
 };
 
 struct FDynamicScriptStruct : FDynamicObject
@@ -127,11 +129,6 @@ private:
     TMap<FString, FDynamicEnum*> DynamicEnums {};
     TMap<FString, FDynamicFunction*> DynamicFunctions {};
     
-    RC::Function<UPackage*(UObject*, const TCHAR*)> CreatePackage {};
-    RC::Function<void*(UClass*, int32, FName, int32, int32, EClassFlags, EClassCastFlags, const TCHAR*, EObjectFlags,
-                       void (*)(const FObjectInitializer*), UObject*(*)(void*), void (*)(UObject*, void*))> UClass_Ctor {};
-    RC::Function<void(UClass*, bool)> UClass_AssembleReferenceTokenStream {};
-
     UPackage* FindOrCreatePackage(const FString& PackageName);
     UClass* FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Context, const FString& ClassPath);
     UClass* FindOrCreateClass(FDynamicClassGenerationContext& Context, const FString& ClassPath);

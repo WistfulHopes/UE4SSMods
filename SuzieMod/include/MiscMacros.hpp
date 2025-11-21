@@ -49,20 +49,20 @@ FORCEINLINE const TCHAR* GetPropertyName(const std::type_info& Type)
     return STR("Unknown");
 }
 
-#define CALL_BASE_CTOR()                                                                    \
-    auto Super = StaticClass()->GetSuperClass();                                            \
-    uintptr_t CtorAddr = reinterpret_cast<uintptr_t>(Super->GetClassConstructor()) + 0xE;   \
-    CtorAddr = *reinterpret_cast<int*>(CtorAddr + 0x1) + (CtorAddr + 0x5);                  \
-    auto Ctor = reinterpret_cast<void(*)(UObject*, const FObjectInitializer*)>(CtorAddr);   \
+#define CALL_BASE_CTOR()                                                                                    \
+    auto Super = StaticClass()->GetSuperClass();                                                            \
+    uintptr_t CtorAddr = reinterpret_cast<uintptr_t>(Super->GetClassConstructor()) + 0xE;                   \
+    CtorAddr = *reinterpret_cast<int*>(CtorAddr + 0x1) + (CtorAddr + 0x5);                                  \
+    auto Ctor = reinterpret_cast<void(*)(UObject*, const SuzieNamespace::FObjectInitializer*)>(CtorAddr);   \
     Ctor(ObjectInitializer->Obj, ObjectInitializer);
 
 #define CLONE_VTABLE(VTable, Size)                              \
     auto OrigVTable = *reinterpret_cast<uintptr_t**>(this);     \
-    FMemory::Memcpy(VTable, OrigVTable, Size * 8);                 \
+    FMemory::Memcpy(VTable, OrigVTable, Size * 8);              \
     *reinterpret_cast<uintptr_t*>(this) = (uintptr_t)&VTable;
 
-#define ASSIGN_TO_VTABLE(VTable, Index, Class, OriginalFunc, OverrideFunc)  \
-    OriginalFunc.assign_address((void*)VTable[Index]);                      \
+#define ASSIGN_TO_VTABLE(VTable, Index, Class, OriginalFunc, OverrideFunc)      \
+    OriginalFunc.assign_address((void*)VTable[Index]);                          \
     *reinterpret_cast<void(Class::**)()>(&VTable[Index]) = &Class::OverrideFunc;
 
 #define IS_STRUCT_PROPERTY(TypeName)                            \

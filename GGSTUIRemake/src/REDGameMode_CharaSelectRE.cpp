@@ -10,7 +10,7 @@ FDynamicClass AREDGameMode_CharaSelectRE::Data = {
     .Ctor = &AREDGameMode_CharaSelectRE::AREDGameMode_CharaSelectRE_Ctor,
 };
 
-void AREDGameMode_CharaSelectRE::AREDGameMode_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer)
+void AREDGameMode_CharaSelectRE::AREDGameMode_CharaSelectRE_Ctor(const SuzieNamespace::FObjectInitializer* ObjectInitializer)
 {
     CALL_BASE_CTOR()
 

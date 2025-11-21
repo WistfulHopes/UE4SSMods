@@ -26,7 +26,7 @@ class AREDGameMode_CharaSelectRE : public AREDGameMode
     DECLARE_EXTERNAL_OBJECT_CLASS(AREDGameMode_CharaSelectRE, REDExtend)
 
 public:
-    static void AREDGameMode_CharaSelectRE_Ctor(const FObjectInitializer* ObjectInitializer);
+    static void AREDGameMode_CharaSelectRE_Ctor(const SuzieNamespace::FObjectInitializer* ObjectInitializer);
     static void InitializeClass();
     
     static FDynamicClass Data;
