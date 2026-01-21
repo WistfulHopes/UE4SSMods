@@ -1,10 +1,13 @@
 #pragma once
 
-#include <Particles.h>
+#include <Particles.hpp>
 #include <Unreal/Rotator.hpp>
 
-#include "struct_util.h"
-#include "CXXBYTE.h"
+#include "struct_util.hpp"
+#include "CXXBYTE.hpp"
+#include "safetyhook.hpp"
+
+extern int GameFrame;
 
 enum ACTV_STATE
 {
@@ -47,6 +50,7 @@ public:
     FIELD(0x14, bool, m_IsPlayerObj);
     FIELD(0x44, SIDE_ID, m_SideID);
     FIELD(0x48, EMemberID, m_MemberID);
+    FIELD(0x260, OBJ_CBase*, m_pParentPly);
     FIELD(0xA080, CXXBYTE<32>, m_CurActionName);
     FIELD(0xA3FC, CCreateArg, m_CreateArg);
     FIELD(0xA7A8, class UParticleSystemComponent*, m_pLinkPSC);
@@ -202,17 +206,51 @@ public:
         bool LinkParticleUseArg;
         CCreateArg LinkParticleCreateArg;
         bool bLinkParticleSet;
+        uint32_t LinkParticleStartFrame;
+        uint32_t LinkParticleActiveFrame;
         CXXBYTE<32> LinkParticleActName;
         unsigned int PointLightId;
     };
 
     SRollbackData m_RollbackData;
-    float m_LinkParticleStartTime;
-    int m_LinkParticleActiveFrame;
+    int m_LinkParticleActiveFrame = -1;
+};
+
+class AA_CRandMT
+{
+public:
+    struct FRollbackData
+    {
+        uint32_t m_State[624];
+        int32_t m_Left;
+        int32_t m_Initf;
+        uint32_t* m_pNext;
+    };
+    
+    uint32_t m_State[624];
+    int32_t m_Left;
+    int32_t m_Initf;
+    uint32_t* m_pNext;
+
+    void MakeRollbackData(FRollbackData& data)
+    {
+    }
 };
 
 extern std::unordered_map<OBJ_CBase*, OBJ_CBaseExt> objData;
+extern bool bIsSave;
 extern bool bIsRollback;
+extern AA_CRandMT* Random;
+
+extern SafetyHookInline DeleteLinkPSC_Detour;
+extern SafetyHookInline UEParticleGet_Detour;
+extern SafetyHookInline CreateParticleArg_Detour;
+extern SafetyHookInline LinkParticleEx_Detour;
+extern SafetyHookInline LinkParticleArg_Detour;
+extern SafetyHookInline OBJ_CBase_Ctor_Detour;
+extern SafetyHookInline ObjectConstructor_Detour;
+extern SafetyHookInline AfterFrameStep_Detour;
+extern SafetyHookInline UpdateBattle_Detour;
 
 struct RollbackData {
     BATTLE_CObjectManager* ObjManager = nullptr;
@@ -222,7 +260,9 @@ struct RollbackData {
     void* BtlEvent = nullptr;
     AA_CCamera::FRollbackData CamRollbackData;
     BattleBGLocation::FRollbackData BGRollbackData;
+    AA_CRandMT::FRollbackData RandomRollbackData;
     std::unordered_map<OBJ_CBase*, OBJ_CBaseExt> StoredObjData;
+    int SavedGameFrame;
     
     void SaveObj(BATTLE_CObjectManager* InObjManager);
     void SaveChara(BATTLE_CObjectManager* InObjManager);

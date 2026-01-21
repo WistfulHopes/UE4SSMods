@@ -10,8 +10,8 @@
 #include "UObject.hpp"
 #include "SigScanner/SinglePassSigScanner.hpp"
 
-// #define RIOT
-#define ISUKA
+#define RIOT
+// #define ISUKA
 // #define LANE_SYSTEM
 
 using namespace RC::Unreal;
@@ -595,7 +595,7 @@ struct FSpawnPlayerInfo
     int ColorIDConvTableNum;
 };
 
-class Coda : public CppUserModBase
+class GGST_RIOT : public CppUserModBase
 {
 private:
     static inline SafetyHookInline UkemiCheck;
@@ -636,20 +636,20 @@ private:
     static inline Function<uint32_t(OBJ_CCharBase*)> DirSign;
 
 public:
-    Coda()
+    GGST_RIOT()
     {
         DBMTable = 0;
 
-        ModName = STR("Coda");
+        ModName = STR("RIOT");
         ModVersion = STR("1.0");
-        ModDescription = STR("Replaces DBM values");
+        ModDescription = STR("RIOT code behind");
         ModAuthors = STR("WistfulHopes");
         // Do not change this unless you want to target a UE4SS version
         // other than the one you're currently building with somehow.
         //ModIntendedSDKVersion = STR("2.6");
     }
 
-    ~Coda() override
+    ~GGST_RIOT() override
     {
         int WorldWidthScale = 1000;
         int ScreenZoomScale = 1000;
@@ -951,18 +951,22 @@ public:
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 840)
                 {
+                    ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 60 / 100;
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 60 / 100;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 600)
                 {
+                    ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 70 / 100;
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 70 / 100;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 420)
                 {
+                    ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 80 / 100;
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 80 / 100;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 300)
                 {
+                    ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 90 / 100;
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 90 / 100;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 180)
@@ -1456,14 +1460,14 @@ public:
                 // Data modification
                 uint32_t NewRiscScalingArray[] = {
                     256,
-                    230,
-                    200,
-                    170,
-                    140,
-                    110,
+                    245,
+                    220,
+                    195,
+                    165,
+                    128,
                     80,
-                    50,
-                    20,
+                    40,
+                    24,
                     12,
                     8,
                 };
@@ -1817,15 +1821,15 @@ public:
     }
 };
 
-#define CODA_API __declspec(dllexport)
+#define RIOT_API __declspec(dllexport)
 
 extern "C" {
-CODA_API CppUserModBase* start_mod()
+RIOT_API CppUserModBase* start_mod()
 {
-    return new Coda();
+    return new GGST_RIOT();
 }
 
-CODA_API void uninstall_mod(CppUserModBase* mod)
+RIOT_API void uninstall_mod(CppUserModBase* mod)
 {
     delete mod;
 }

@@ -1,6 +1,8 @@
-#include "BattleState.h"
-#include "Unreal.h"
-#include <cstring>
+#include "BattleState.hpp"
+#include "Unreal.hpp"
+
+int GameFrame = 0;
+AA_CRandMT* Random = nullptr;
 
 void RollbackData::SaveObj(BATTLE_CObjectManager* InObjManager)
 {
@@ -237,6 +239,11 @@ void RollbackData::SaveState(AREDGameState_Battle* GameState) {
 	BGRollbackData.m_OffsetMatrix = GameState->BGLocation->m_OffsetMatrix;
 	BGRollbackData.m_OffsetMove_Location = GameState->BGLocation->m_OffsetMove_Location;
 	BGRollbackData.m_OffsetMove_Rotation = GameState->BGLocation->m_OffsetMove_Rotation;
+	std::memcpy(RandomRollbackData.m_State, Random->m_State, 4 * 624);
+	RandomRollbackData.m_Left = Random->m_Left;
+	RandomRollbackData.m_Initf = Random->m_Initf;
+	RandomRollbackData.m_pNext = Random->m_pNext;
+	SavedGameFrame = GameFrame;
 }
 
 void RollbackData::LoadObj(BATTLE_CObjectManager* InObjManager)
@@ -272,7 +279,7 @@ void RollbackData::LoadRPG(BATTLE_CObjectManager* InObjManager)
 {
 	for (int i = 0; i < 10; i++)
 	{
-		if (ObjManager->m_ObjVector[i].m_ActiveState > 0)
+		if (ObjManager->m_RpgVector[i].m_ActiveState > 0)
 		{
             std::memcpy(&InObjManager->m_RpgVector[i].ObjBaseSyncBegin, &ObjManager->m_RpgVector[i].ObjBaseSyncBegin, sizeof(OBJ_CRPGBase) - 8);
 			auto from = StoredObjData[&ObjManager->m_RpgVector[i]];
@@ -482,4 +489,9 @@ void RollbackData::LoadState(AREDGameState_Battle* GameState)
 	GameState->BGLocation->m_OffsetMatrix = BGRollbackData.m_OffsetMatrix;
 	GameState->BGLocation->m_OffsetMove_Location = BGRollbackData.m_OffsetMove_Location;
 	GameState->BGLocation->m_OffsetMove_Rotation = BGRollbackData.m_OffsetMove_Rotation;
+	std::memcpy(Random->m_State, RandomRollbackData.m_State, 4 * 624);
+	Random->m_Left = RandomRollbackData.m_Left;
+	Random->m_Initf = RandomRollbackData.m_Initf;
+	Random->m_pNext = RandomRollbackData.m_pNext;
+	GameFrame = SavedGameFrame;
 }
