@@ -8,12 +8,12 @@ void RollbackData::SaveObj(BATTLE_CObjectManager* InObjManager)
 {
 	for (int i = 0; i < 400; i++)
 	{
-        if (InObjManager->m_ObjVector[i].m_ActiveState > 0)
+        if (InObjManager->m_ObjVector[i].m_ActiveState != ACTV_NOT_ACTIVE)
         {
             std::memcpy(&ObjManager->m_ObjVector[i].ObjBaseSyncBegin, &InObjManager->m_ObjVector[i].ObjBaseSyncBegin, sizeof(OBJ_CBase) - 8);
-        	auto from = objData[&ObjManager->m_ObjVector[i]];
-        	auto to = StoredObjData[&ObjManager->m_ObjVector[i]];
-        	std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
+        	auto& from = objData[&ObjManager->m_ObjVector[i]];
+        	auto& to = StoredObjData[&ObjManager->m_ObjVector[i]];
+        	std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
         }
 	}
 }
@@ -23,43 +23,40 @@ void RollbackData::SaveChara(BATTLE_CObjectManager* InObjManager)
 	for (int i = 0; i < 6; i++)
 	{
         std::memcpy(&ObjManager->m_CharVector[i].ObjBaseSyncBegin, &InObjManager->m_CharVector[i].ObjBaseSyncBegin, sizeof(OBJ_CCharBase) - 8);
-		auto from = objData[&ObjManager->m_CharVector[i]];
-		auto to = StoredObjData[&ObjManager->m_CharVector[i]];
-		std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
+		auto& from = objData[&ObjManager->m_CharVector[i]];;
+		auto& to = StoredObjData[&ObjManager->m_CharVector[i]];
+       	std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
 	}
 }
 
-void RollbackData::SaveRPG(BATTLE_CObjectManager* InObjManager)
+void RollbackData::SaveStage(BATTLE_CObjectManager* InObjManager)
 {
 	for (int i = 0; i < 10; i++)
 	{
-        if (InObjManager->m_ObjVector[i].m_ActiveState > 0)
-        {
-            std::memcpy(&ObjManager->m_RpgVector[i].ObjBaseSyncBegin, &InObjManager->m_RpgVector[i].ObjBaseSyncBegin, sizeof(OBJ_CRPGBase) - 8);
-        	auto from = objData[&ObjManager->m_RpgVector[i]];
-        	auto to = StoredObjData[&ObjManager->m_RpgVector[i]];
-        	std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
-        }
+		std::memcpy(&ObjManager->m_StageVector[i].ObjBaseSyncBegin, &InObjManager->m_StageVector[i].ObjBaseSyncBegin, sizeof(OBJ_CStageBase) - 8);
+		auto& from = objData[&ObjManager->m_StageVector[i]];
+		auto& to = StoredObjData[&ObjManager->m_StageVector[i]];
+		std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
 	}
 }
 
 void RollbackData::SaveState(AREDGameState_Battle* GameState) {
 	if (ObjManager == nullptr)
 		ObjManager = static_cast<BATTLE_CObjectManager*>(RC::Unreal::FMemory::Malloc(sizeof(BATTLE_CObjectManager)));
-	std::memcpy(ObjManager, GameState->BattleObjectManager, 0x83C0);
+	std::memcpy(reinterpret_cast<char*>(ObjManager) + 8, reinterpret_cast<char*>(GameState->BattleObjectManager) + 8, 0x83C0);
     std::memcpy(reinterpret_cast<char*>(ObjManager) + 0x12637E0, reinterpret_cast<char*>(GameState->BattleObjectManager) + 0x12637E0, 0x23BF0);
     SaveObj(GameState->BattleObjectManager);
     SaveChara(GameState->BattleObjectManager);
-    SaveRPG(GameState->BattleObjectManager);
+    SaveStage(GameState->BattleObjectManager);
 	if (ScrManager == nullptr)
 		ScrManager = static_cast<BATTLE_CScreenManager*>(RC::Unreal::FMemory::Malloc(sizeof(BATTLE_CScreenManager)));
 	std::memcpy(ScrManager, GameState->BattleScreenManager, sizeof(BATTLE_CScreenManager));
 	if (State == nullptr)
 		State = static_cast<BattleState*>(RC::Unreal::FMemory::Malloc(sizeof(BattleState)));
-	std::memcpy(State, GameState->State, sizeof(BattleState));
+	std::memcpy(reinterpret_cast<char*>(State) + 8, reinterpret_cast<char*>(GameState->State) + 8, sizeof(BattleState));
 	if (EvtManager == nullptr)
 		EvtManager = static_cast<BattleEventManager*>(RC::Unreal::FMemory::Malloc(sizeof(BattleEventManager)));
-	std::memcpy(EvtManager, GameState->EventManager, sizeof(BattleEventManager));
+	std::memcpy(reinterpret_cast<char*>(EvtManager) + 8, reinterpret_cast<char*>(GameState->EventManager) + 8, sizeof(BattleEventManager));
 
 	if (BtlEvent)
 	{
@@ -250,12 +247,12 @@ void RollbackData::LoadObj(BATTLE_CObjectManager* InObjManager)
 {
 	for (int i = 0; i < 400; i++)
 	{
-		if (ObjManager->m_ObjVector[i].m_ActiveState > 0)
+		if (ObjManager->m_ObjVector[i].m_ActiveState != ACTV_NOT_ACTIVE)
 		{
 			std::memcpy(&InObjManager->m_ObjVector[i].ObjBaseSyncBegin, &ObjManager->m_ObjVector[i].ObjBaseSyncBegin, sizeof(OBJ_CBase) - 8);
-			auto from = StoredObjData[&ObjManager->m_ObjVector[i]];
-			auto to = objData[&ObjManager->m_ObjVector[i]];
-			std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
+			auto& from = StoredObjData[&ObjManager->m_ObjVector[i]];
+			auto& to = objData[&ObjManager->m_ObjVector[i]];
+       		std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
 		}
 		else
 		{
@@ -269,27 +266,20 @@ void RollbackData::LoadChara(BATTLE_CObjectManager* InObjManager)
 	for (int i = 0; i < 6; i++)
 	{
         std::memcpy(&InObjManager->m_CharVector[i].ObjBaseSyncBegin, &ObjManager->m_CharVector[i].ObjBaseSyncBegin, sizeof(OBJ_CCharBase) - 8);
-		auto from = StoredObjData[&ObjManager->m_CharVector[i]];
-		auto to = objData[&ObjManager->m_CharVector[i]];
-		std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
+		auto& from = StoredObjData[&ObjManager->m_CharVector[i]];
+		auto& to = objData[&ObjManager->m_CharVector[i]];
+       	std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
 	}
 }
 
-void RollbackData::LoadRPG(BATTLE_CObjectManager* InObjManager)
+void RollbackData::LoadStage(BATTLE_CObjectManager* InObjManager)
 {
 	for (int i = 0; i < 10; i++)
 	{
-		if (ObjManager->m_RpgVector[i].m_ActiveState > 0)
-		{
-            std::memcpy(&InObjManager->m_RpgVector[i].ObjBaseSyncBegin, &ObjManager->m_RpgVector[i].ObjBaseSyncBegin, sizeof(OBJ_CRPGBase) - 8);
-			auto from = StoredObjData[&ObjManager->m_RpgVector[i]];
-			auto to = objData[&ObjManager->m_RpgVector[i]];
-			std::memcpy(&to, &from, sizeof(OBJ_CBaseExt));
-		}
-		else
-		{
-			InObjManager->m_RpgVector[i].m_ActiveState = ACTV_NOT_ACTIVE;
-		}
+		std::memcpy(&InObjManager->m_StageVector[i].ObjBaseSyncBegin, &ObjManager->m_StageVector[i].ObjBaseSyncBegin, sizeof(OBJ_CStageBase) - 8);
+		auto& from = StoredObjData[&ObjManager->m_StageVector[i]];
+		auto& to = objData[&ObjManager->m_StageVector[i]];
+		std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
 	}
 }
 
@@ -297,20 +287,20 @@ void RollbackData::LoadState(AREDGameState_Battle* GameState)
 {
 	if (ObjManager == nullptr)
 		return;
-	std::memcpy(GameState->BattleObjectManager, ObjManager, 0x83C0);
+	std::memcpy(reinterpret_cast<char*>(GameState->BattleObjectManager) + 8, reinterpret_cast<char*>(ObjManager) + 8, 0x83C0);
 	std::memcpy(reinterpret_cast<char*>(GameState->BattleObjectManager) + 0x12637E0, reinterpret_cast<char*>(ObjManager) + 0x12637E0, 0x23C10);
 	LoadObj(GameState->BattleObjectManager);
 	LoadChara(GameState->BattleObjectManager);
-	LoadRPG(GameState->BattleObjectManager);
+	LoadStage(GameState->BattleObjectManager);
 	if (ScrManager == nullptr)
 		return;
 	std::memcpy(GameState->BattleScreenManager, ScrManager, sizeof(BATTLE_CScreenManager));
 	if (State == nullptr)
 		return;
-	std::memcpy(GameState->State, State, sizeof(BattleState));
+	std::memcpy(reinterpret_cast<char*>(GameState->State) + 8, reinterpret_cast<char*>(State) + 8, sizeof(BattleState));
 	if (EvtManager == nullptr)
 		return;
-	std::memcpy(GameState->EventManager, EvtManager, sizeof(BattleEventManager));
+	std::memcpy(reinterpret_cast<char*>(GameState->EventManager) + 8, reinterpret_cast<char*>(EvtManager) + 8, sizeof(BattleEventManager));
 
 	if (GameState->EventManager->m_pBattleEvent)
 	{
@@ -489,7 +479,7 @@ void RollbackData::LoadState(AREDGameState_Battle* GameState)
 	GameState->BGLocation->m_OffsetMatrix = BGRollbackData.m_OffsetMatrix;
 	GameState->BGLocation->m_OffsetMove_Location = BGRollbackData.m_OffsetMove_Location;
 	GameState->BGLocation->m_OffsetMove_Rotation = BGRollbackData.m_OffsetMove_Rotation;
-	std::memcpy(Random->m_State, RandomRollbackData.m_State, 4 * 624);
+	std::memcpy(Random->m_State, RandomRollbackData.m_State, sizeof(uint32_t) * 624);
 	Random->m_Left = RandomRollbackData.m_Left;
 	Random->m_Initf = RandomRollbackData.m_Initf;
 	Random->m_pNext = RandomRollbackData.m_pNext;

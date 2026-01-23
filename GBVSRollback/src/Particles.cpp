@@ -57,8 +57,9 @@ UParticleSystemComponent* GetCachedPSC(OBJ_CBase* obj, CXXBYTE<32>* name)
 	const auto iter2 = rollbackData.pscCache.find(key);
 	if (iter2 == rollbackData.pscCache.end())
 		return nullptr;
+	auto result = iter2->second;
 	rollbackData.pscCache.erase(iter2);
-	return obj->m_pLinkPSC;
+	return result;
 }
 
 UParticleSystemComponent* GetCachedPSCForSet(OBJ_CBase* obj)
@@ -81,13 +82,14 @@ UParticleSystemComponent* GetCachedPSCForSet(OBJ_CBase* obj)
 		const auto iter2 = rollbackData.pscCache.find(key);
 		if (iter2 == rollbackData.pscCache.end())
 			return nullptr;
+		auto result = iter2->second;
 		rollbackData.pscCache.erase(iter2);
-		return obj->m_pLinkPSC;
+		return result;
 	}
 	return nullptr;
 }
 
-bool Rollback_ProcessCachedPSC(OBJ_CBase* obj, CXXBYTE<32>* name, int objType, bool useArg)
+bool Rollback_ProcessCachedPSC(OBJ_CBase* obj, CXXBYTE<32>* name)
 {
 	if (!bIsRollback && !bIsSave) return false;
 	
@@ -101,8 +103,7 @@ bool Rollback_ProcessCachedPSC(OBJ_CBase* obj, CXXBYTE<32>* name, int objType, b
 	{
 		if (obj->m_pLinkPSC)
 		{
-			DeleteLinkPSC_Detour.call(obj, true);
-		    objData[obj].m_LinkParticleActiveFrame = -1;
+			DeleteLinkPSC_Hook(obj);
 		}
 
 		if (name->m_Buf[0] == 0) return true;
@@ -119,7 +120,7 @@ bool Rollback_ProcessCachedPSC(OBJ_CBase* obj, CXXBYTE<32>* name, int objType, b
 	const auto iter = objData.find(obj);
 	if (!iter->second.m_RollbackData.bLinkParticleSet)
 	{
-		Rollback_OnLinkParticle(obj, name, objType, useArg);
+		Rollback_OnLinkParticle(obj, name);
 	}
 	return true;
 }
@@ -131,31 +132,10 @@ bool Rollback_ProcessCachedUnlinkedPSC(OBJ_CBase* obj, CXXBYTE<32>* name)
 	return UseUnlinkedPSC(obj, name);
 }
 
-void Rollback_OnLinkParticle(OBJ_CBase* obj, CXXBYTE<32>* name, int objType, bool useArg)
+void Rollback_OnLinkParticle(OBJ_CBase* obj, CXXBYTE<32>* name)
 {
 	auto data = &objData[obj].m_RollbackData;
 	strcpy(data->LinkParticleName.m_Buf, name->m_Buf);
-	data->LinkParticleObjType = objType;
-	strcpy(data->LinkParticleCreateArg.m_CreateArg_SocketName.m_Buf, obj->m_CreateArg.m_CreateArg_SocketName.m_Buf);
-	data->LinkParticleUseArg = useArg;
-	data->LinkParticleCreateArg.m_CreateArg_Angle = obj->m_CreateArg.m_CreateArg_Angle;
-	data->LinkParticleCreateArg.m_CreateArg_AngleY = obj->m_CreateArg.m_CreateArg_AngleY;
-	data->LinkParticleCreateArg.m_CreateArg_OffsetPosX = obj->m_CreateArg.m_CreateArg_OffsetPosX;
-	data->LinkParticleCreateArg.m_CreateArg_OffsetPosY = obj->m_CreateArg.m_CreateArg_OffsetPosY;
-	data->LinkParticleCreateArg.m_CreateArg_OffsetPosZ = obj->m_CreateArg.m_CreateArg_OffsetPosZ;
-	data->LinkParticleCreateArg.m_CreateArg_ScaleX = obj->m_CreateArg.m_CreateArg_ScaleX;
-	data->LinkParticleCreateArg.m_CreateArg_ScaleY = obj->m_CreateArg.m_CreateArg_ScaleY;
-	data->LinkParticleCreateArg.m_CreateArg_ScaleZ = obj->m_CreateArg.m_CreateArg_ScaleZ;
-	data->LinkParticleCreateArg.m_CreateArg_Hikitsugi0 = obj->m_CreateArg.m_CreateArg_Hikitsugi0;
-	data->LinkParticleCreateArg.m_CreateArg_HkrColor = obj->m_CreateArg.m_CreateArg_HkrColor;
-	data->LinkParticleCreateArg.m_CreateArg_MltColor = obj->m_CreateArg.m_CreateArg_MltColor;
-	data->LinkParticleCreateArg.m_CreateArg_TransPriority = obj->m_CreateArg.m_CreateArg_TransPriority;
-	data->LinkParticleCreateArg.m_CreateArg_Direction = obj->m_CreateArg.m_CreateArg_Direction;
-	data->LinkParticleCreateArg.m_CreateArg_SocketUse = obj->m_CreateArg.m_CreateArg_SocketUse;
-	data->LinkParticleCreateArg.m_CreateArg_SocketWithRot = obj->m_CreateArg.m_CreateArg_SocketWithRot;
-	data->LinkParticleCreateArg.m_CreateArg_NoAssert = obj->m_CreateArg.m_CreateArg_NoAssert;
-	data->LinkParticleCreateArg.m_CreateArg_PointLightSide = obj->m_CreateArg.m_CreateArg_PointLightSide;
-	data->LinkParticleCreateArg.m_CreateArg_PointLightMember = obj->m_CreateArg.m_CreateArg_PointLightMember;
 	strcpy(data->LinkParticleActName.m_Buf, obj->m_CurActionName.m_Buf);
 	data->LinkParticleStartFrame = GameFrame;
 }

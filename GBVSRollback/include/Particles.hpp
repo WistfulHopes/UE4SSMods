@@ -67,8 +67,10 @@ public:
 class UParticleSystemComponent : public RC::Unreal::USceneComponent
 {
 public:
+    BIT_FIELD(0x59A, 0x20, bAutoDestroy);
     FIELD(0x658, float, CustomTimeDilation);
     FIELD(0x7B8, class OBJ_CBase*, LinkObjPtr);
+    FIELD(0x7C0, bool, bPause);
     FIELD(0x7C4, unsigned int, PointLightId);
     
     static RC::Unreal::UClass* StaticClass;
@@ -88,7 +90,8 @@ void AddUnlinkedPSCToCache(OBJ_CBase* obj, CXXBYTE<32>* name, UParticleSystemCom
 bool UseUnlinkedPSC(OBJ_CBase* obj, CXXBYTE<32>* name);
 UParticleSystemComponent* GetCachedPSC(OBJ_CBase* obj, CXXBYTE<32>* name);
 UParticleSystemComponent* GetCachedPSCForSet(OBJ_CBase* obj);
-bool Rollback_ProcessCachedPSC(OBJ_CBase* obj, CXXBYTE<32>* name, int objType, bool useArg);
+bool Rollback_ProcessCachedPSC(OBJ_CBase* obj, CXXBYTE<32>* name);
 bool Rollback_ProcessCachedUnlinkedPSC(OBJ_CBase* obj, CXXBYTE<32>* name);
-void Rollback_OnLinkParticle(OBJ_CBase* obj, CXXBYTE<32>* name, int objType, bool useArg);
+void Rollback_OnLinkParticle(OBJ_CBase* obj, CXXBYTE<32>* name);
 bool AddLinkPSCToCache(OBJ_CBase* obj);
+void DeleteLinkPSC_Hook(OBJ_CBase* pThis);

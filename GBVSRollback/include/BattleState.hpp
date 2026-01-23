@@ -64,11 +64,11 @@ class OBJ_CCharBase : public OBJ_CBase {
 
 static_assert(sizeof(OBJ_CCharBase) == 0x3BD40);
 
-class OBJ_CRPGBase : public OBJ_CBase {
+class OBJ_CStageBase : public OBJ_CBase {
     char rpg_pad[0x738];
 };
 
-static_assert(sizeof(OBJ_CRPGBase) == 0xB078);
+static_assert(sizeof(OBJ_CStageBase) == 0xB078);
 
 class BATTLE_TeamManager {
     char pad[0x78];
@@ -95,7 +95,7 @@ public:
     ARRAY_FIELD(0x1BC0, OBJ_CBase*[416], m_SortedObjPtrVector);
     ARRAY_FIELD(0x83C0, OBJ_CBase[400], m_ObjVector);
     ARRAY_FIELD(0x108F7C0, OBJ_CCharBase[6], m_CharVector);
-    ARRAY_FIELD(0x11F6740, OBJ_CRPGBase[10], m_RpgVector);
+    ARRAY_FIELD(0x11F6740, OBJ_CStageBase[10], m_StageVector);
 };
 
 static_assert(sizeof(BATTLE_CObjectManager) == 0x1288800);
@@ -202,9 +202,6 @@ public:
     struct SRollbackData
     {
         CXXBYTE<32> LinkParticleName;
-        int LinkParticleObjType;
-        bool LinkParticleUseArg;
-        CCreateArg LinkParticleCreateArg;
         bool bLinkParticleSet;
         uint32_t LinkParticleStartFrame;
         uint32_t LinkParticleActiveFrame;
@@ -258,18 +255,18 @@ struct RollbackData {
     BattleState* State = nullptr;
     BattleEventManager* EvtManager = nullptr;
     void* BtlEvent = nullptr;
-    AA_CCamera::FRollbackData CamRollbackData;
-    BattleBGLocation::FRollbackData BGRollbackData;
-    AA_CRandMT::FRollbackData RandomRollbackData;
-    std::unordered_map<OBJ_CBase*, OBJ_CBaseExt> StoredObjData;
-    int SavedGameFrame;
+    AA_CCamera::FRollbackData CamRollbackData{};
+    BattleBGLocation::FRollbackData BGRollbackData{};
+    AA_CRandMT::FRollbackData RandomRollbackData{};
+    std::unordered_map<OBJ_CBase*, OBJ_CBaseExt> StoredObjData{};
+    int SavedGameFrame = 0;
     
     void SaveObj(BATTLE_CObjectManager* InObjManager);
     void SaveChara(BATTLE_CObjectManager* InObjManager);
-    void SaveRPG(BATTLE_CObjectManager* InObjManager);
+    void SaveStage(BATTLE_CObjectManager* InObjManager);
     void SaveState(class AREDGameState_Battle* GameState);
     void LoadObj(BATTLE_CObjectManager* InObjManager);
     void LoadChara(BATTLE_CObjectManager* InObjManager);
-    void LoadRPG(BATTLE_CObjectManager* InObjManager);
+    void LoadStage(BATTLE_CObjectManager* InObjManager);
     void LoadState(class AREDGameState_Battle* GameState);
 };
