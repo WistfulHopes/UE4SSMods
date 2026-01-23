@@ -4,6 +4,16 @@
 int GameFrame = 0;
 AA_CRandMT* Random = nullptr;
 
+RollbackData::~RollbackData()
+{
+	RC::Unreal::FMemory::Free(ObjManager);
+	RC::Unreal::FMemory::Free(ScrManager);
+	RC::Unreal::FMemory::Free(State);
+	RC::Unreal::FMemory::Free(EvtManager);
+	RC::Unreal::FMemory::Free(BtlEvent);
+	StoredObjData.clear();
+}
+
 void RollbackData::SaveObj(BATTLE_CObjectManager* InObjManager)
 {
 	for (int i = 0; i < 400; i++)
@@ -60,8 +70,11 @@ void RollbackData::SaveState(AREDGameState_Battle* GameState) {
 
 	if (BtlEvent)
 	{
-		RC::Unreal::FMemory::Free(BtlEvent);
-		BtlEvent = nullptr;
+		if (GameState->EventManager->m_CurrentBEMState <= 41)
+		{
+			RC::Unreal::FMemory::Free(BtlEvent);
+			BtlEvent = nullptr;
+		}
 	}
 	
 	if (GameState->EventManager->m_pBattleEvent)
@@ -304,8 +317,11 @@ void RollbackData::LoadState(AREDGameState_Battle* GameState)
 
 	if (GameState->EventManager->m_pBattleEvent)
 	{
-		RC::Unreal::FMemory::Free(GameState->EventManager->m_pBattleEvent);
-		GameState->EventManager->m_pBattleEvent = nullptr;
+		if (GameState->EventManager->m_CurrentBEMState <= 41 && GameState->EventManager->m_CurrentBEMState)
+		{
+			RC::Unreal::FMemory::Free(GameState->EventManager->m_pBattleEvent);
+			GameState->EventManager->m_pBattleEvent = nullptr;
+		}
 	}
 
 	if (BtlEvent)

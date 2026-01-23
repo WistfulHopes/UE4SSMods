@@ -250,6 +250,8 @@ extern SafetyHookInline AfterFrameStep_Detour;
 extern SafetyHookInline UpdateBattle_Detour;
 
 struct RollbackData {
+    ~RollbackData();
+    
     BATTLE_CObjectManager* ObjManager = nullptr;
     BATTLE_CScreenManager* ScrManager = nullptr;
     BattleState* State = nullptr;
@@ -260,6 +262,7 @@ struct RollbackData {
     AA_CRandMT::FRollbackData RandomRollbackData{};
     std::unordered_map<OBJ_CBase*, OBJ_CBaseExt> StoredObjData{};
     int SavedGameFrame = 0;
+    int32_t Inputs[2];
     
     void SaveObj(BATTLE_CObjectManager* InObjManager);
     void SaveChara(BATTLE_CObjectManager* InObjManager);

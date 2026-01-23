@@ -1,6 +1,5 @@
 #include "safetyhook.hpp"
 #include <BattleState.hpp>
-#include <gekkonet.h>
 #include <Particles.hpp>
 #include <Unreal.hpp>
 #include <UE4SSProgram.hpp>
@@ -14,11 +13,11 @@
 AREDGameState_Battle* GameState{};
 bool bCanRollback = false;
 bool bRollbackTest = false;
+RollbackData Data{};
 Particle_RollbackData rollbackData{};
 std::unordered_map<OBJ_CBase*, OBJ_CBaseExt> objData;
 bool bIsSave = false;
 bool bIsRollback = false;
-GekkoSession* session = nullptr;
 void* g_SystemManager;
 int32_t g_Inputs[2];
 
@@ -287,6 +286,8 @@ void SaveForRollback(RollbackData* Data)
     bIsRollback = false;
     PreBackup();
     Data->SaveState(GameState);
+    Data->Inputs[0] = g_Inputs[0];
+    Data->Inputs[1] = g_Inputs[1];
     bIsSave = false;
 }
 
@@ -297,6 +298,8 @@ void LoadForRollback(RollbackData* Data)
     PreRollback();
     Data->LoadState(GameState);
     PostRollback();
+    g_Inputs[0] = Data->Inputs[0];
+    g_Inputs[1] = Data->Inputs[1];
     bIsRollback = false;
 }
 
@@ -309,67 +312,32 @@ void UpdateBattle_Hook(AREDGameState_Battle* pThis, float DeltaTime, bool bUpdat
     }
     if (bRollbackTest)
     {
+        int Inputs[2];
         for (int i = 0; i < 2; i++)
         {
             auto GKFFlag = *(int32_t*)(*(uintptr_t*)(*(uintptr_t*)g_SystemManager + 0x1F8 + Side2Pad(i, 0) * 8) + 0x78);
             auto RecFlag = GKF2RecFlag(Side2Pad(i, 0), GKFFlag, false);
-
-            gekko_add_local_input(session, i, &RecFlag);
+            Inputs[i] = RecFlag;
         }
-
-        int evtCountSession = 0;
-        GekkoSessionEvent** events = gekko_session_events(session, &evtCountSession);
-        for (int i = 0; i < evtCountSession; i++)
+        if (GameFrame % 2 == 1)
         {
-            GekkoSessionEvent* event = events[i];
-            switch (event->type)
-            {
-            case DesyncDetected:
-                auto desync = event->data.desynced;
-                Output::send(std::format(
-                        STR("DESYNC!!! f:{}, rh:{}, lc:{}, rc:{}\n"), desync.frame, desync.remote_handle,
-                        desync.local_checksum, desync.remote_checksum)
-                );
-                assert(false);
-                break;
-            }
+            bIsRollback = true;
+            LoadForRollback(&Data);
+            UpdateBattle_Detour.call(pThis, DeltaTime, bUpdateDraw);
+            GameFrame++;
+            bIsRollback = false;
+            g_Inputs[0] = Inputs[0];
+            g_Inputs[1] = Inputs[1];
+            UpdateBattle_Detour.call(pThis, DeltaTime, bUpdateDraw);
+            GameFrame++;
         }
-
-        int evtCountGame = 0;
-        GekkoGameEvent** updates = gekko_update_session(session, &evtCountGame);
-        for (int i = 0; i < evtCountGame; i++)
+        else
         {
-            GekkoGameEvent* event = updates[i];
-            switch (event->type)
-            {
-            case SaveEvent:
-                {
-                    *event->data.save.state_len = sizeof(RollbackData);
-                    auto Data = reinterpret_cast<RollbackData*>(event->data.save.state);
-                    new (Data) RollbackData;
-                    for (int j = 0; j < 416; j++)
-                    {
-                        auto Obj = GameState->BattleObjectManager->m_SortedObjPtrVector[j];
-                        Data->StoredObjData.insert({Obj, OBJ_CBaseExt()});
-                    }
-                    SaveForRollback(Data);
-                }
-                break;
-
-            case LoadEvent:
-                LoadForRollback(reinterpret_cast<RollbackData*>(event->data.save.state));
-                break;
-
-            case AdvanceEvent:
-                for (int j = 0; j < 2; j++)
-                {
-                    g_Inputs[j] = ((int32_t*)(event->data.adv.inputs))[j];
-                }
-                printf("\n");
-                UpdateBattle_Detour.call(pThis, DeltaTime, bUpdateDraw);
-                GameFrame++;
-                break;
-            }
+            SaveForRollback(&Data);
+            g_Inputs[0] = Inputs[0];
+            g_Inputs[1] = Inputs[1];
+            UpdateBattle_Detour.call(pThis, DeltaTime, bUpdateDraw);
+            GameFrame++;
         }
         ClearPSCCache();
         ClearUnusedUnlinkedPSC();
@@ -381,33 +349,6 @@ void UpdateBattle_Hook(AREDGameState_Battle* pThis, float DeltaTime, bool bUpdat
     }
 
     bIsRollback = false;
-}
-
-void InitGekko()
-{
-    session = nullptr;
-
-    gekko_create_stress(&session);
-
-    GekkoConfig config{};
-
-    config.desync_detection = true;
-    config.input_size = sizeof(int32_t);
-    config.state_size = sizeof(RollbackData);
-    config.max_spectators = 0;
-    config.input_prediction_window = 10;
-    config.num_players = 2;
-
-    gekko_start(session, &config);
-    gekko_add_actor(session, LocalPlayer, nullptr);
-    gekko_set_local_delay(session, 0, 1);
-    gekko_add_actor(session, LocalPlayer, nullptr);
-    gekko_set_local_delay(session, 1, 1);
-}
-
-void EndGekko()
-{
-    gekko_destroy(&session);
 }
 
 // Mod
@@ -440,7 +381,6 @@ public:
 
         Unreal::Hook::RegisterInitGameStatePreCallback([](Unreal::AGameModeBase* Context)
         {
-            EndGekko();
             rollbackData = Particle_RollbackData();
             objData.clear();
             const auto Class = Unreal::UObjectGlobals::StaticFindObject<UClass*>(
@@ -451,7 +391,6 @@ public:
                 AREDGameState_Battle::instance = static_cast<AREDGameState_Battle*>(UObjectGlobals::FindFirstOf(
                     FName(STR("REDGameState_Battle"))));
                 GameState = AREDGameState_Battle::GetGameState();
-                InitGekko();
                 bCanRollback = true;
                 GameFrame = 0;
                 Random = nullptr;
