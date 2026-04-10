@@ -186,7 +186,8 @@ public:
   enum class box_type : int {
     hurt = 0,
     hit = 1,
-    grab = 2 // Not used by the game
+    grab = 2, // Not used by the game
+    followup_hit = 18,
   };
 
   box_type type;
@@ -323,58 +324,61 @@ public:
   FIELD(0x20, bool, is_player);
   FIELD(0x44, unsigned char, player_index);
   FIELD(0x78, hitbox*, hitboxes);
-  FIELD(0x10C, int, hurtbox_count);
-  FIELD(0x110, int, hitbox_count);
-  BIT_FIELD(0x1A8, 0x4000000, cinematic_counter);
-  FIELD(0x1C4, int, action_time);
-  FIELD(0x1E0, int, act_reg_0);
-  FIELD(0x280, int, hitstop);
-  FIELD(0x2AC, int, ground_height);
-  FIELD(0x2B0, asw_entity*, parent_ply);
-  FIELD(0x2B8, asw_entity*, parent_obj);
-  FIELD(0x2C0, asw_player*, opponent);
-  FIELD(0x318, asw_entity*, attached);
-  BIT_FIELD(0x390, 1, airborne);
-  BIT_FIELD(0x390, 256, counterhit);
-  BIT_FIELD(0x394, 16, strike_invuln);
-  BIT_FIELD(0x394, 32, throw_invuln);
-  BIT_FIELD(0x394, 64, wakeup);
-  BIT_FIELD(0x398, 32, landed_hit);
-  FIELD(0x3A4, direction, facing);
-  FIELD(0x3A8, int, pos_x);
-  FIELD(0x3AC, int, pos_y);
-  FIELD(0x3B0, int, pos_z);
-  FIELD(0x3B4, int, angle_x);
-  FIELD(0x3B8, int, angle_y);
-  FIELD(0x3BC, int, angle_z);
-  FIELD(0x3C4, int, scale_x);
-  FIELD(0x3C8, int, scale_y);
-  FIELD(0x3CC, int, scale_z);
-  FIELD(0x4C8, int, vel_x);
-  FIELD(0x4CC, int, vel_y);
-  FIELD(0x4D0, int, gravity);
-  FIELD(0x4FC, int, pushbox_front_offset);
-  FIELD(0x750, atk_param, atk_param_hit);
-  FIELD(0x790, int, activation_range_x_max);
-  FIELD(0x794, int, activation_range_y_max);
-  FIELD(0x798, int, activation_range_x_min);
-  FIELD(0x79C, int, activation_range_y_min);
-  FIELD(0x7A0, int, throw_range);
-  FIELD(0xB68, atk_param_ex, atk_param_ex_normal); // Outdated?
-  FIELD(0xC2C, atk_param_ex, atk_param_ex_counter); // Outdated?
-  FIELD(0xD10, atk_param, atk_param_defend); // Outdated?
-  FIELD(0x1128, atk_param_ex, atk_param_ex_defend); // Outdated?
-  FIELD(0x1208, int, backdash_invuln);
+  ARRAY_FIELD(0x114, int[19], box_counts);
+  FIELD(0x114, int, hurtbox_count);
+  FIELD(0x118, int, hitbox_count);
+  FIELD(0x15C, int, followup_hitbox_count);
+  BIT_FIELD(0x1B0, 0x4000000, cinematic_counter);
+  FIELD(0x1CC, int, action_time);
+  FIELD(0x1E8, int, act_reg_0);
+  FIELD(0x288, int, hitstop);
+  FIELD(0x2B4, int, ground_height);
+  FIELD(0x2B8, asw_entity*, parent_ply);
+  FIELD(0x2C0, asw_entity*, parent_obj);
+  FIELD(0x2C8, asw_player*, opponent);
+  FIELD(0x320, asw_entity*, attached);
+  BIT_FIELD(0x398, 1, airborne);
+  BIT_FIELD(0x398, 256, counterhit);
+  BIT_FIELD(0x39C, 16, strike_invuln);
+  BIT_FIELD(0x39C, 32, throw_invuln);
+  BIT_FIELD(0x39C, 64, wakeup);
+  BIT_FIELD(0x3A0, 32, landed_hit);
+  FIELD(0x3AC, direction, facing);
+  FIELD(0x3B0, int, pos_x);
+  FIELD(0x3B4, int, pos_y);
+  FIELD(0x3B8, int, pos_z);
+  FIELD(0x3BC, int, angle_x);
+  FIELD(0x3C0, int, angle_y);
+  FIELD(0x3C4, int, angle_z);
+  FIELD(0x3CC, int, scale_x);
+  FIELD(0x3D0, int, scale_y);
+  FIELD(0x3D4, int, scale_z);
+  FIELD(0x4D0, int, vel_x);
+  FIELD(0x4D4, int, vel_y);
+  FIELD(0x4D8, int, gravity);
+  FIELD(0x510, int, pushbox_front_offset);
+  FIELD(0x758, atk_param, atk_param_hit);
+  FIELD(0x798, int, activation_range_x_max);
+  FIELD(0x79C, int, activation_range_y_max);
+  FIELD(0x7A0, int, activation_range_x_min);
+  FIELD(0x7A4, int, activation_range_y_min);
+  FIELD(0x7A8, int, throw_range);
+  FIELD(0xB78, atk_param_ex, atk_param_ex_normal); // Outdated?
+  FIELD(0xC3C, atk_param_ex, atk_param_ex_counter); // Outdated?
+  FIELD(0xD20, atk_param, atk_param_defend); // Outdated?
+  FIELD(0x1140, atk_param_ex, atk_param_ex_defend); // Outdated?
+  FIELD(0x1218, int, throw_invuln_time);
+  FIELD(0x1220, int, strike_invuln_time);
   // bbscript
-  FIELD(0x127C, bbscript::event_bitmask, event_handler_bitmask);
-  FIELD(0x12c0, char*, bbs_file);
-  FIELD(0x12c8, char*, script_base);
-  FIELD(0x12d0, char*, next_script_cmd);
-  FIELD(0x12d8, char*, first_script_cmd);
+  FIELD(0x1288, bbscript::event_bitmask, event_handler_bitmask);
+  FIELD(0x12D8, char*, bbs_file);
+  FIELD(0x12E0, char*, script_base);
+  FIELD(0x12E8, char*, next_script_cmd);
+  FIELD(0x12F0, char*, first_script_cmd);
 
-  ARRAY_FIELD(0x12E0, char[32], sprite_name);
-  FIELD(0x1300, int, sprite_duration);
-  FIELD(0x1308, int, sprite_total_duration);
+  ARRAY_FIELD(0x12F8, char[32], sprite_name);
+  FIELD(0x1318, int, sprite_duration);
+  FIELD(0x1320, int, sprite_total_duration);
   //    FIELD(0x3740, int, sprite_changes);
   //    ARRAY_FIELD(0x13bc, event_handler[(size_t)bbscript::event_type::MAX], event_handlers);
   //    ARRAY_FIELD(0x37a4, char[20], state_name); // m_CurActionName (old: 0x3628, 0x118 offset)
@@ -626,21 +630,21 @@ enum PLATTACK_FLAG {
 class asw_player : public asw_entity {
 
 public:
-  FIELD(0x6310, int, enable_flag); // original: 0x6080 -> fixed: 0x60E0 (+0x060)
-  FIELD(0x631C, int, attack_flag); // original: 0x5F90 -> fixed: 0x60EC (+0x060)
-  FIELD(0x6330, int, blockstun); // original: 0x60A0 + 0x060 = 0x6100
-  FIELD(0x9AF8, int, hitstun); // original: 0x9868 + 0x060 = 0x98C8
+  FIELD(0x6320, int, enable_flag); // original: 0x6080 -> fixed: 0x60E0 (+0x060)
+  FIELD(0x632C, int, attack_flag); // original: 0x5F90 -> fixed: 0x60EC (+0x060)
+  FIELD(0x6340, int, blockstun); // original: 0x60A0 + 0x060 = 0x6100
+  FIELD(0x9B08, int, hitstun); // original: 0x9868 + 0x060 = 0x98C8
 
-  FIELD(0x9BC8, int, pushboxYUpperAir);
-  FIELD(0x9BCC, int, pushboxYLowerAir);
+  FIELD(0x9BD8, int, pushboxYUpperAir);
+  FIELD(0x9BDC, int, pushboxYLowerAir);
 
-  FIELD(0xC4FC, ID_CMNACT, cur_cmn_action_id); // original: 0xC26C + 0x060 = 0xC2CC
-  FIELD(0xD22C, int, slowdown_timer); // original: 0xCF9C + 0x060 = 0xCFFC
-  FIELD(0x108B0, MoveDataCollection, move_datas);
+  FIELD(0xC50C, ID_CMNACT, cur_cmn_action_id); // original: 0xC26C + 0x060 = 0xC2CC
+  FIELD(0xD248, int, slowdown_timer); // original: 0xCF9C + 0x060 = 0xCFFC
+  FIELD(0x10900, MoveDataCollection, move_datas);
 
-  FIELD(0x10328, int, afro); // m_IsAfro Header: 0xed28, Offset: 0x508
-  FIELD(0x10360, int, afroW);
-  FIELD(0x10364, int, afroH);
+  FIELD(0x10360, int, afro); // m_IsAfro Header: 0xed28, Offset: 0x508
+  FIELD(0x10398, int, afroW);
+  FIELD(0x1039C, int, afroH);
 
   int calc_advantage();
   bool is_in_hitstun() const;

@@ -1,5 +1,7 @@
 #include "hitboxes.h"
 
+#include <valarray>
+
 #include "arcsys.h"
 #include "draw_utils.h"
 
@@ -238,6 +240,8 @@ void draw_hitbox(const DrawTool &tool, const asw_entity &entity, const DrawnHitb
   FLinearColor color;
   if (box.type == hitbox::box_type::hit)
     color = FLinearColor{1.f, 0.f, 0.f, .25f};
+  else if (box.type == hitbox::box_type::followup_hit)
+    color = FLinearColor{1.f, 0.6f, 0.f, .25f};
   else if (box.type == hitbox::box_type::grab)
     color = FLinearColor{1.f, 0.f, 1.f, .25f};
   else if (entity.counterhit)
@@ -355,9 +359,20 @@ hitbox calc_throw_box(const asw_player &entity) {
 
 void draw_hitboxes(const DrawTool &tool, const asw_entity &entity, bool active) {
   const auto count = entity.hitbox_count + entity.hurtbox_count;
+  
+  int count_before_followup = 0;
+  for (int i = 0; i < 18; i++)
+  {
+    count_before_followup += entity.box_counts[i];
+  }
 
   std::vector<DrawnHitbox> hitboxes;
   // Collect hitbox info
+  for (auto i = count_before_followup; i < count_before_followup + entity.followup_hitbox_count; i++)
+  {
+    hitboxes.push_back(DrawnHitbox(entity.hitboxes[i]));
+  }
+  
   for (auto i = 0; i < count; i++) {
     const auto &box = entity.hitboxes[i];
 
@@ -370,7 +385,6 @@ void draw_hitboxes(const DrawTool &tool, const asw_entity &entity, bool active) 
 
     hitboxes.push_back(DrawnHitbox(box));
   }
-
   
   if(entity.is_player){
     asw_player& player = *(asw_player*)&entity;
