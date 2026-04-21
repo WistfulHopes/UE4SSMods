@@ -9,6 +9,7 @@
 #include <SigScanner/SinglePassSigScanner.hpp>
 
 #include <imgui.h>
+#include <set>
 #include <backends/imgui_impl_dx11.h>
 #include <backends/imgui_impl_win32.h>
 #include <glaze/json/read.hpp>
@@ -166,25 +167,65 @@ namespace RC::GUI::ModManager
             error_popup();
 
             ImGui::Begin("Guilty Gear -Strive- Mod Manager", &m_config.m_is_open, window_flags);
+            
+            if (m_current_directory != std::filesystem::path(m_config.m_mods_folder))
+            {
+                if (ImGui::Button("Up One Folder"))
+                {
+                    m_current_directory = m_current_directory.parent_path();
+                }
+            }
+            
+            int i = 0;
+            for (auto& directory_entry : std::filesystem::directory_iterator(m_current_directory))
+            {
+                ImGui::PushID(i);
+                
+                const auto& path = directory_entry.path();
+                auto relative = std::filesystem::relative(path, m_config.m_mods_folder);
+                std::string filename = relative.filename().string();
+                
+                if (directory_entry.is_directory())
+                {
+                    if (ImGui::Button(filename.c_str()))
+                    {
+                        m_current_directory /= path.filename();
+                    }
+                }
+                else
+                {
+                    ModEntry* mod = nullptr;
 
-            ImGuiStyle& style = ImGui::GetStyle();
+                    for (auto& mod_itr : m_config.m_mods)
+                    {
+                        if (std::filesystem::path(mod_itr.m_path) == path)
+                        {
+                            mod = &mod_itr;
+                        }
+                    }
+        
+                    if (mod)
+                    {
+                        ImGui::Checkbox("##mod-enabled", &mod->m_enabled);
+                        ImGui::SameLine();
+                        ImGui::Text(mod->m_name.c_str());
+                        ImGui::Text("Priority: ");
+                        ImGui::SameLine();
+                        ImGui::InputInt("##mod-priority", &mod->m_priority);
+                    }
+                }
 
-            ImVec2 windowPosition = ImGui::GetWindowPos();
-            ImVec2 cursorPosition = ImGui::GetCursorPos();
-            float scroll = ImGui::GetScrollY();
+                ImGui::Separator();
+                ImGui::PopID();
+                
+                i++;
+            }
 
-            // this is not a pixel perfect position
-            // you can try to make it more accurate by adding some offset
-            ImVec2 itemPosition(
-                windowPosition.x + cursorPosition.x,
-                windowPosition.y + cursorPosition.y - style.ItemSpacing.y
-            );
-
-            for (int i = 0; i < m_config.m_mods.size(); i++)
+            /*for (int i = 0; i < m_config.m_mods.size(); i++)
             {
                 ImGui::PushID(i);
 
-                ImGui::Checkbox("##mod-enabled", &m_config.m_mods[i].enabled);
+                ImGui::Checkbox("##mod-enabled", &m_config.m_mods[i].m_enabled);
 
                 ImGui::SameLine();
                 ImGui::Selectable((m_config.m_mods[i].m_name + "##" + std::to_string(i)).c_str());
@@ -208,10 +249,11 @@ namespace RC::GUI::ModManager
                 ImGui::Separator();
 
                 ImGui::PopID();
-            }
+            }*/
 
             if (ImGui::Button("Change Mod Folder"))
             {
+                m_prev_mods_folder = m_config.m_mods_folder;
                 m_config.m_mods_folder = "";
             }
 
@@ -279,6 +321,7 @@ namespace RC::GUI::ModManager
                 if (std::filesystem::exists(m_config.m_mods_folder))
                 {
                     m_mods_loaded = false;
+                    m_current_directory = m_config.m_mods_folder;
                     load_mods();
                     ImGui::CloseCurrentPopup();
                 }
@@ -287,6 +330,12 @@ namespace RC::GUI::ModManager
                     m_error = Error::InvalidPath;
                     ImGui::CloseCurrentPopup();
                 }
+            }
+            
+            if (ImGui::Button("Cancel"))
+            {
+                m_config.m_mods_folder = m_prev_mods_folder;
+                ImGui::CloseCurrentPopup();
             }
 
             ImGui::EndPopup();
@@ -438,7 +487,7 @@ namespace RC::GUI::ModManager
 
     auto ModManager::save_config() -> void
     {
-        std::ignore = glz::write_file_json(m_config, "./mod_manager.json", std::string{});
+        std::ignore = glz::write_file_json<glz::opts{.prettify = true}>(m_config, "./mod_manager.json", std::string{});
     }
 
     auto ModManager::load_mods() -> void
@@ -449,6 +498,11 @@ namespace RC::GUI::ModManager
         }
         if (m_mods_loaded || m_config.m_mods_folder.empty()) return;
 
+        if (m_current_directory.string().empty())
+        {
+            m_current_directory = m_config.m_mods_folder;
+        }
+        
         save_config();
 
         std::vector<ModEntry> enabled_mods;
@@ -456,7 +510,7 @@ namespace RC::GUI::ModManager
 
         for (const auto& entry : m_config.m_mods)
         {
-            if (entry.enabled) enabled_mods.emplace_back(entry);
+            if (entry.m_enabled) enabled_mods.emplace_back(entry);
             else disabled_mods.emplace_back(entry);
         }
 
@@ -497,7 +551,7 @@ namespace RC::GUI::ModManager
                 if (it == m_config.m_mods.end())
                 {
                     m_config.m_mods.emplace_back(ModEntry{
-                        .enabled = true, .m_path = dir_entry.path().string(),
+                        .m_enabled = true, .m_path = dir_entry.path().string(),
                         .m_name = dir_entry.path().filename().string()
                     });
                 }
@@ -513,16 +567,26 @@ namespace RC::GUI::ModManager
             }
             else ++it;
         }
-
-        for (auto& m_mod : std::ranges::reverse_view(m_config.m_mods))
+        
+        for (auto& m_mod : m_config.m_mods)
         {
             auto path = FString(to_wstring(m_mod.m_path).c_str());
             OnUnmountPak->Call(path);
 
-            if (!m_mod.enabled) continue;
+            if (!m_mod.m_enabled) continue;
+
+            MountPak->Call(path, m_mod.m_priority + 100);
+        }
+        
+        /*for (auto& m_mod : std::ranges::reverse_view(m_config.m_mods))
+        {
+            auto path = FString(to_wstring(m_mod.m_path).c_str());
+            OnUnmountPak->Call(path);
+
+            if (!m_mod.m_enabled) continue;
 
             MountPak->Call(path, MountPak->Pak()->PakFiles.Num() * 100);
-        }
+        }*/
 
         m_mods_loaded = true;
     }

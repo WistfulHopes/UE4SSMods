@@ -14,9 +14,15 @@ namespace RC::GUI::ModManager
     
     struct ModEntry
     {
-        bool enabled;
+        bool m_enabled;
+        int m_priority;
         std::string m_path;
         std::string m_name;
+        
+        friend auto operator<=> (const ModEntry& lhs, const ModEntry& rhs) -> std::strong_ordering
+        {
+            return lhs.m_priority <=> rhs.m_priority;
+        };
     };
 
     struct ModsConfig
@@ -50,5 +56,7 @@ namespace RC::GUI::ModManager
         bool m_mods_loaded{false};
         int m_active_item{-1};
         std::filesystem::path m_sig{};
+        std::filesystem::path m_current_directory{};
+        std::string m_prev_mods_folder{};
     };
 }
