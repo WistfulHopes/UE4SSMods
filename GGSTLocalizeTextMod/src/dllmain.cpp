@@ -56,7 +56,7 @@ public:
 
                 Output::send(std::format(STR("Read text at {}.\n"), to_wstring(entry.path().string())));
             }
-    });
+        });
 
         
         const SignatureContainer AddStaticLocalizeText{
