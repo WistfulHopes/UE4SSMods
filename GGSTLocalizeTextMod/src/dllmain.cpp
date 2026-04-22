@@ -1,9 +1,12 @@
 #include <Mod/CppUserModBase.hpp>
 
 #include "UE4SSProgram.hpp"
+#include "Hooks/Hooks.hpp"
 
 class GGSTLocalizeTextMod : public CppUserModBase
 {
+    static inline Function<Unreal::int32(const void*, SIZE_T)> Func;
+    
 public:
     GGSTLocalizeTextMod()
     {
@@ -22,48 +25,46 @@ public:
 
     auto on_unreal_init() -> void override
     {
+        Unreal::Hook::RegisterInitGameStatePreCallback([](Unreal::AGameModeBase* Context)
+        {
+            auto path = std::filesystem::path(UE4SSProgram::get_program().get_game_executable_directory());
+            auto text_directory = path.parent_path().parent_path() / "Localization";
+            if (!std::filesystem::exists(text_directory))
+            {
+                Output::send(STR("No text directory found...\n"));
+            }
+            for (const auto& entry : std::filesystem::directory_iterator(text_directory))
+            {
+                if (entry.path().extension() != ".loc")
+                    continue;
+                    
+                std::ifstream file(entry.path(), std::ios::in | std::ios::binary);
+
+                if (file.fail())
+                    continue;
+                    
+                file.seekg(0, file.end);
+                const size_t size = file.tellg();
+                file.seekg(0, file.beg);
+
+                const auto buffer = new char[size];
+                    
+                file.read(buffer, size);
+                file.close();
+                    
+                Func(buffer, size);
+
+                Output::send(std::format(STR("Read text at {}.\n"), to_wstring(entry.path().string())));
+            }
+    });
+
+        
         const SignatureContainer AddStaticLocalizeText{
             {{"40 55 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 45 ? 4C 8B C2"}},
             [&](const SignatureContainer& self)
             {
-                Function<Unreal::int32(const void*, SIZE_T)> Func;
                 Func.assign_address(self.get_match_address());
-                
-                auto path = std::filesystem::path(UE4SSProgram::get_program().get_game_executable_directory());
-                auto text_directory = path.parent_path().parent_path() / "Localization";
-                if (!std::filesystem::exists(text_directory))
-                {
-                    Output::send(STR("No text directory found...\n"));
-                }
-                for (const auto& entry : std::filesystem::directory_iterator(text_directory))
-                {
-                    if (entry.path().extension() != ".loc")
-                        continue;
-                    
-                    std::ifstream file(entry.path(), std::ios::in);
-
-                    if (file.fail())
-                        continue;
-                    
-                    file.seekg(0, file.end);
-                    const size_t size = file.tellg();
-                    file.seekg(0, file.beg);
-
-                    const auto buffer = new char[size];
-                    
-                    file.read(buffer, size);
-                    file.close();
-                    
-                    std::wstring wide = to_wstring(std::string(buffer));
-                    
-                    Unreal::TArray data((Unreal::uint8*)wide.c_str(), wide.size() * 2);
-                    data.Insert({0xFF, 0xFE}, 0);
-
-                    Func(data.GetData(), data.Num());
-
-                    Output::send(std::format(STR("Read text at {}.\n"), to_wstring(entry.path().string())));
-                }
-                return true;
+                return false;
             },
             [](SignatureContainer& self)
             {
