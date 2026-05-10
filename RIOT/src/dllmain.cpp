@@ -10,8 +10,8 @@
 #include "UObject.hpp"
 #include "SigScanner/SinglePassSigScanner.hpp"
 
-#define RIOT
-// #define ISUKA
+// #define RIOT
+#define ISUKA
 // #define LANE_SYSTEM
 
 using namespace RC::Unreal;
@@ -194,7 +194,7 @@ enum ID_CMNACT : uint32_t
 
 class BATTLE_TeamManager
 {
-    char pad[0x190];
+    char pad[0x198];
 
 public:
     FIELD(0x8, class OBJ_CCharBase*, m_MainPlayer);
@@ -219,7 +219,7 @@ public:
 
 class CAtkParam
 {
-    char pad[0x410];
+    char pad[0x420];
 
 public:
     FIELD(0x0, int, atk_type);
@@ -257,7 +257,7 @@ public:
 
 class CAtkParamEx
 {
-    char pad[0xC0];
+    char pad[0xC4];
 
 public:
     FIELD(0x14, int, m_AtkLandStunTime);
@@ -295,57 +295,57 @@ public:
     FIELD(0x28, int, m_ObjTimer);
     FIELD(0x4C, int, m_SideID);
     FIELD(0x50, int, m_MemberID);
-    FIELD(0x1A8, unsigned int, m_ObjFlag);
-    FIELD(0x1B0, unsigned int, m_ObjFlag3);
-    FIELD(0x1C4, int, m_ActionTime);
-    FIELD(0x280, int, m_HitStopTime);
-    FIELD(0x28C, int, m_HitStopTimeBySousai);
-    FIELD(0x2B0, OBJ_CCharBase*, m_pParentPly);
-    FIELD(0x2C0, OBJ_CCharBase*, m_pTargetObj);
-    FIELD(0x3A0, unsigned int, m_CollisionFlag3);
-    FIELD(0x3AC, int, m_PosY);
-    FIELD(0x3B0, int, m_PosZ);
-    FIELD(0x4C8, int, m_SpeedX);
-    FIELD(0x4CC, int, m_SpeedY);
-    FIELD(0x4D0, int, m_Gravity);
-    FIELD(0x750, CAtkParam, m_AtkParam);
-    FIELD(0xB68, CAtkParamEx, m_AtkParamNH);
-    FIELD(0xC2C, CAtkParamEx, m_AtkParamCH);
-    FIELD(0xD10, CAtkParam, m_DmgParam);
-    FIELD(0x1128, CAtkParamEx, m_DmgParamEx);
-    FIELD(0x11F8, int, m_bIsCounterHit);
-    FIELD(0x1208, int, m_MutekiDagekiTime);
-    ARRAY_FIELD(0x13f8, CInterruptInfo[106], m_InterruptInfo);
-    FIELD(0x3868, uint8_t*, m_TmpArgAddr);
-    FIELD(0x38D4, CActionRequestInfo, m_ActionRequestInfoReg);
-    FIELD(0x3910, OBJ_CCharBase*, m_pControlObject);
-    FIELD(0x62F8, unsigned int, m_PlayerFlag2);
-    FIELD(0x630C, unsigned int, m_CtrlDir);
-    FIELD(0x6310, unsigned int, m_EnableFlag);
-    FIELD(0x6314, unsigned int, m_Enable2Flag);
-    FIELD(0x6330, unsigned int, m_GuardStopCount);
-    FIELD(0x9AF8, int, m_StunCount);
-    FIELD(0x9B30, int, ply_JumpSpeed);
-    FIELD(0x9B6C, int, ply_Kizetsu);
-    FIELD(0xC414, int, m_ComboCount);
-    FIELD(0xC43C, int, m_ComboTimeWithOutAnten);
-    FIELD(0xC494, bool, m_IsImperfectCombo);
-    FIELD(0xC496, bool, m_UkemiMiss);
-    FIELD(0xC4A8, int, m_KizetsuPoint);
-    FIELD(0xC4AC, int, m_KizetsuMax);
-    FIELD(0xC4B0, int, m_KizetsuTime);
-    FIELD(0xC4B4, int, m_KizetsuTimeMax);
-    FIELD(0xC4FC, ID_CMNACT, m_CurCmnActionID);
-    FIELD(0xCA20, int, m_ExKizetsu);
-    FIELD(0xCA40, int, m_DustHomingTime);
-    FIELD(0xCA44, int, m_DustHomingSubTime);
-    FIELD(0xCA8C, int, m_GuardBalance);
-    FIELD(0xF050, CAtkParam, m_AtkParamForGGThrowStack);
-    FIELD(0xF460, CAtkParamEx, m_AtkParamCHForGGThrowStack);
-    FIELD(0xF540, CAtkParamEx, m_AtkParamNHForGGThrowStack);
-    FIELD(0x10840, int, m_CPUUkemi);
-    char pad[0xc500];
-    uint8_t m_InpFlag[2][333];
+    FIELD(0x1B0, unsigned int, m_ObjFlag);
+    FIELD(0x1B8, unsigned int, m_ObjFlag3);
+    FIELD(0x1CC, int, m_ActionTime);
+    FIELD(0x288, int, m_HitStopTime);
+    FIELD(0x294, int, m_HitStopTimeBySousai);
+    FIELD(0x2B8, OBJ_CCharBase*, m_pParentPly);
+    FIELD(0x2C8, OBJ_CCharBase*, m_pTargetObj);
+    FIELD(0x3A8, unsigned int, m_CollisionFlag3);
+    FIELD(0x3B4, int, m_PosY);
+    FIELD(0x3B8, int, m_PosZ);
+    FIELD(0x4D0, int, m_SpeedX);
+    FIELD(0x4D4, int, m_SpeedY);
+    FIELD(0x4D8, int, m_Gravity);
+    FIELD(0x758, CAtkParam, m_AtkParam);
+    FIELD(0xB78, CAtkParamEx, m_AtkParamNH);
+    FIELD(0xC3C, CAtkParamEx, m_AtkParamCH);
+    FIELD(0xD20, CAtkParam, m_DmgParam);
+    FIELD(0x1140, CAtkParamEx, m_DmgParamEx);
+    FIELD(0x1210, int, m_bIsCounterHit);
+    FIELD(0x1220, int, m_MutekiDagekiTime);
+    ARRAY_FIELD(0x1410, CInterruptInfo[106], m_InterruptInfo);
+    FIELD(0x3880, uint8_t*, m_TmpArgAddr);
+    FIELD(0x38EC, CActionRequestInfo, m_ActionRequestInfoReg);
+    FIELD(0x3928, OBJ_CCharBase*, m_pControlObject);
+    FIELD(0x6308, unsigned int, m_PlayerFlag2);
+    FIELD(0x631C, unsigned int, m_CtrlDir);
+    FIELD(0x6320, unsigned int, m_EnableFlag);
+    FIELD(0x6324, unsigned int, m_Enable2Flag);
+    FIELD(0x6340, unsigned int, m_GuardStopCount);
+    FIELD(0x9B08, int, m_StunCount);
+    FIELD(0x9B40, int, ply_JumpSpeed);
+    FIELD(0x9B7C, int, ply_Kizetsu);
+    FIELD(0xC424, int, m_ComboCount);
+    FIELD(0xC44C, int, m_ComboTimeWithOutAnten);
+    FIELD(0xC4A4, bool, m_IsImperfectCombo);
+    FIELD(0xC4A6, bool, m_UkemiMiss);
+    FIELD(0xC4B8, int, m_KizetsuPoint);
+    FIELD(0xC4BC, int, m_KizetsuMax);
+    FIELD(0xC4C0, int, m_KizetsuTime);
+    FIELD(0xC4C4, int, m_KizetsuTimeMax);
+    FIELD(0xC50C, ID_CMNACT, m_CurCommonActionID);
+    FIELD(0xCA38, int, m_ExKizetsu);
+    FIELD(0xCA58, int, m_DustHomingTime);
+    FIELD(0xCA5C, int, m_DustHomingSubTime);
+    FIELD(0xCA9C, int, m_GuardBalance);
+    FIELD(0xF078, CAtkParam, m_AtkParamForGGThrowStack);
+    FIELD(0xF498, CAtkParamEx, m_AtkParamCHForGGThrowStack);
+    FIELD(0xF55C, CAtkParamEx, m_AtkParamNHForGGThrowStack);
+    FIELD(0x10868, int, m_CPUUkemi);
+    char pad[0xc510];
+    uint8_t m_InpFlag[2][337];
 
     bool IsInHitstun();
     bool IsInBlockstun();
@@ -369,18 +369,19 @@ public:
     int m_ScriptType{};
     int m_CostumeID{};
     int m_Handicap{};
+    uint8_t m_SpFlag;
 };
 
 class CSceneChange
 {
 public:
     ARRAY_FIELD(0xC, CSceneChangeCharaInfo[3], m_scCharInfoP1);
-    ARRAY_FIELD(0x48, CSceneChangeCharaInfo[3], m_scCharInfoP2);
+    ARRAY_FIELD(0x54, CSceneChangeCharaInfo[3], m_scCharInfoP2);
 };
 
 bool OBJ_CCharBase::IsInHitstun()
 {
-    switch (m_CurCmnActionID)
+    switch (m_CurCommonActionID)
     {
     case ID_CmnActNokezoriHighLv1:
     case ID_CmnActNokezoriHighLv2:
@@ -461,7 +462,7 @@ bool OBJ_CCharBase::IsInHitstun()
 
 bool OBJ_CCharBase::IsInBlockstun()
 {
-    switch (m_CurCmnActionID)
+    switch (m_CurCommonActionID)
     {
     case ID_CmnActMidGuardPre:
     case ID_CmnActMidGuardLoop:
@@ -481,7 +482,7 @@ bool OBJ_CCharBase::IsInBlockstun()
 
 bool OBJ_CCharBase::IsDownBound()
 {
-    switch (m_CurCmnActionID)
+    switch (m_CurCommonActionID)
     {
     case ID_CmnActBDownBound:
     case ID_CmnActFDownBound:
@@ -492,17 +493,17 @@ bool OBJ_CCharBase::IsDownBound()
 
 bool OBJ_CCharBase::IsQuickDown1()
 {
-    return m_CurCmnActionID == ID_CmnActQuickDown;
+    return m_CurCommonActionID == ID_CmnActQuickDown;
 }
 
 bool OBJ_CCharBase::IsQuickDown2()
 {
-    return m_CurCmnActionID == ID_CmnActQuickDown2Stand;
+    return m_CurCommonActionID == ID_CmnActQuickDown2Stand;
 }
 
 bool OBJ_CCharBase::IsDownLoop()
 {
-    switch (m_CurCmnActionID)
+    switch (m_CurCommonActionID)
     {
     case ID_CmnActBDownLoop:
     case ID_CmnActFDownLoop:
@@ -513,7 +514,7 @@ bool OBJ_CCharBase::IsDownLoop()
 
 bool OBJ_CCharBase::IsDown2Stand()
 {
-    switch (m_CurCmnActionID)
+    switch (m_CurCommonActionID)
     {
     case ID_CmnActBDown2Stand:
     case ID_CmnActFDown2Stand: return true;
@@ -528,17 +529,17 @@ bool OBJ_CCharBase::IsKnockdown()
 
 bool OBJ_CCharBase::IsRoll()
 {
-    return m_CurCmnActionID == ID_CmnActKorogari;
+    return m_CurCommonActionID == ID_CmnActKorogari;
 }
 
 bool OBJ_CCharBase::IsStagger()
 {
-    return m_CurCmnActionID == ID_CmnActJitabataLoop;
+    return m_CurCommonActionID == ID_CmnActJitabataLoop;
 }
 
 bool OBJ_CCharBase::IsGuardCrush()
 {
-    switch (m_CurCmnActionID)
+    switch (m_CurCommonActionID)
     {
     case ID_CmnActHajikareStand:
     case ID_CmnActHajikareCrouch:
@@ -559,9 +560,13 @@ struct FMemberCharaInfo
     char ColorID;
     char ScriptType;
     char CostumeID;
+    char EquipmentID;
     bool bAnotherStyle;
     bool bCPU;
     int CPULv;
+    char ColorID_New;
+    char CostumeID_New;
+    char EquipmentID_New;
 };
 
 class UREDBattlePlayerInfo : public UObject
@@ -695,11 +700,23 @@ public:
         GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].bEnable = true;
         GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].bCPU = true;
         GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].CharaID = 0;
-        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].ColorID = 2;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].ColorID = 3;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].ColorID_New = 3;
         GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].bEnable = true;
         GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].bCPU = true;
         GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].CharaID = 0;
-        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].ColorID = 3;
+        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[1].ColorID = 4;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[1].ColorID_New = 4;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].bEnable = false;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].bCPU = false;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].CharaID = 37;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].ColorID = 0;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].ColorID_New = 0;
+        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[2].bEnable = false;
+        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[2].bCPU = false;
+        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[2].CharaID = 0;
+        GameCommon->BattlePlayerInfo[1]->m_MemberCharaInfoList[2].ColorID = 0;
+        GameCommon->BattlePlayerInfo[0]->m_MemberCharaInfoList[2].ColorID_New = 0;
 
         GetSpawnPlayerInfoList.call(SpawnPlayerInfoList, pEasyCharaSelect);
     }
@@ -864,7 +881,7 @@ public:
 
     static void on_frame_step(OBJ_CCharBase* ctx)
     {
-        if (ctx->m_KizetsuTime && ctx->m_CurCmnActionID == ID_CmnActKizetsu)
+        if (ctx->m_KizetsuTime && ctx->m_CurCommonActionID == ID_CmnActKizetsu)
         {
             --ctx->m_KizetsuTime;
             if (ctx->m_InpFlag[0][2] || ctx->m_InpFlag[1][2])
@@ -946,32 +963,40 @@ public:
             {
                 if (ctx->m_ComboTimeWithOutAnten > 1080)
                 {
-                    ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 50 / 100;
-                    ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 10 / 100;
+                    ctx->m_DmgParamEx.m_AtkLandStunTime = 1;
+                    ctx->m_DmgParamEx.m_AtkAirStunTime = 1;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 840)
                 {
-                    ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 60 / 100;
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 60 / 100;
+                    ctx->m_DmgParamEx.m_AtkLandStunTime = 1;
+                    ctx->m_DmgParamEx.m_AtkAirStunTime -= 20;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 600)
                 {
-                    ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 70 / 100;
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 70 / 100;
+                    ctx->m_DmgParamEx.m_AtkLandStunTime = 1;
+                    ctx->m_DmgParamEx.m_AtkAirStunTime -= 15;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 420)
                 {
                     ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 80 / 100;
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 80 / 100;
+                    ctx->m_DmgParamEx.m_AtkLandStunTime -= 10;
+                    ctx->m_DmgParamEx.m_AtkAirStunTime -= 10;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 300)
                 {
                     ctx->m_DmgParamEx.m_AtkLandStunTime = ctx->m_DmgParamEx.m_AtkLandStunTime * 90 / 100;
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 90 / 100;
+                    ctx->m_DmgParamEx.m_AtkLandStunTime -= 5;
+                    ctx->m_DmgParamEx.m_AtkAirStunTime -= 5;
                 }
                 else if (ctx->m_ComboTimeWithOutAnten > 180)
                 {
                     ctx->m_DmgParamEx.m_AtkAirStunTime = ctx->m_DmgParamEx.m_AtkAirStunTime * 95 / 100;
+                    ctx->m_DmgParamEx.m_AtkLandStunTime -= 2;
+                    ctx->m_DmgParamEx.m_AtkAirStunTime -= 2;
                 }
 
                 if (ctx->m_DmgParamEx.m_AtkLandStunTime < 1) ctx->m_DmgParamEx.m_AtkAirStunTime = 1;
@@ -1073,8 +1098,8 @@ public:
                 int InstantBlockXAirPushback = 750;
                 int InstantBlockWindow = 8;
 
-                patch_exe_bytes(DBMTable + 508 * 4, (PBYTE)&WorldWidthScale, 4);
-                patch_exe_bytes(DBMTable + 512 * 4, (PBYTE)&ScreenZoomScale, 4);
+                patch_exe_bytes(DBMTable + 512 * 4, (PBYTE)&WorldWidthScale, 4);
+                patch_exe_bytes(DBMTable + 516 * 4, (PBYTE)&ScreenZoomScale, 4);
                 patch_exe_bytes(DBMTable + 174 * 4, (PBYTE)&InstantBlockXPushback, 4);
                 patch_exe_bytes(DBMTable + 178 * 4, (PBYTE)&InstantBlockXAirPushback, 4);
                 patch_exe_bytes(DBMTable + 176 * 4, (PBYTE)&InstantBlockWindow, 4);
@@ -1097,7 +1122,7 @@ public:
                 // Data modification
                 int ScreenZoomScale = 1350;
 
-                patch_exe_bytes(DBMTable + 512 * 4, (PBYTE)&ScreenZoomScale, 4);
+                patch_exe_bytes(DBMTable + 516 * 4, (PBYTE)&ScreenZoomScale, 4);
 
                 return true;
             },
@@ -1361,7 +1386,7 @@ public:
             {
                 {
                     .signature =
-                    "48 89 5C 24 ? 48 89 54 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 33 DB 4C 8B E9 48 89 5C 24"
+                    "48 89 54 24 ? 48 89 4C 24 ? 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 33 DB"
                 }
             },
             [&](const SignatureContainer& self)
@@ -1387,7 +1412,7 @@ public:
                 PlayerInitializeOnEasyReset = safetyhook::create_mid(self.get_match_address(),
                                                                      [](SafetyHookContext& ctx)
                                                                      {
-                                                                         if (*(char*)(ctx.rax + 0x4E) >= 35) return;
+                                                                         if (*(char*)(ctx.rax + 0x4E) >= 33) return;
                                                                          ctx.rip = PlayerInitializeOnEasyReset_HookAddr
                                                                              + 0xE0;
                                                                      });
