@@ -286,7 +286,7 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
     NewFunction->GetFunctionFlags() |= FunctionFlags;
 
     // Update native function
-    NewFunction->GetFunc() = reinterpret_cast<std::function<void(UObject*, FFrame*, void*)>*>(Function.Func);
+    NewFunction->GetFunc() = reinterpret_cast<std::function<void(UObject*, FFrame&, void* const)>*>(Function.Func);
 
     // Create function parameter properties (and function return value property)
     for (const auto& Property : Function.Properties)
@@ -369,7 +369,7 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
     NewFunction->GetFunctionFlags() |= FunctionFlags;
 
     // Update native function
-    NewFunction->GetFunc() = reinterpret_cast<std::function<void(UObject*, FFrame*, void*)>*>(Function->Func);
+    NewFunction->GetFunc() = reinterpret_cast<std::function<void(UObject*, FFrame&, void* const)>*>(Function->Func);
 
     // Create function parameter properties (and function return value property)
     for (const auto& Property : Function->Properties)
@@ -482,9 +482,18 @@ UPackage* Suzie::FindOrCreatePackage(const FString& PackageName)
     return Package;
 }
 
-UClass* Suzie::UClass_Ctor(UClass* ParentClass, EClassFlags ClassFlags)
+UObject* VTableHelperCtor(void*)
 {
-    EClassFlags ClassFlags = CLASS_Native | CLASS_Intrinsic | ClassFlags;
+    return nullptr;
+}
+
+void ClassAddReferencedObjectsHelper(UObject*, void*)
+{
+}
+
+UClass* Suzie::UClass_Ctor(UClass* ParentClass, FDynamicClass* Class, EClassFlags InClassFlags)
+{
+    EClassFlags ClassFlags = CLASS_Native | CLASS_Intrinsic | InClassFlags;
 
     auto ConstructedClassObject = static_cast<UClass*>(UObjectBase::AllocateUObject(
         UClass::StaticClass()->GetStructureSize(), UClass::StaticClass()->GetMinAlignment(), true));
@@ -494,11 +503,11 @@ UClass* Suzie::UClass_Ctor(UClass* ParentClass, EClassFlags ClassFlags)
     ConstructedClassObject->GetMinAlignment() = ParentClass->GetMinAlignment();
     ConstructedClassObject->GetClassFlags() = ClassFlags;
     ConstructedClassObject->GetClassCastFlags() = CASTCLASS_None;
-    ConstructedClassObject->GetClassConfigName() = FName(STR("Engine"), FNAME_Add);
-    ConstructedClassObject->GetObjectFlags() = static_cast<EObjectFlags>(RF_Public | RF_MarkAsNative | RF_MarkAsRootSet);
-    std::function<void(const void*)>* Ctor = new std::function((void(*)(const void*))Class->Ctor);
-    ConstructedClassObject->GetClassConstructor() = Ctor;
-    std::function<UObject* (void*)>* VTableHelperCtorCaller = new std::function([](void*) -> UObject* { return nullptr; });
+    *reinterpret_cast<const wchar_t**>(&ConstructedClassObject->GetClassConfigName()) = STR("Engine");
+    ConstructedClassObject->GetObjectFlags() = static_cast<EObjectFlags>(RF_Public | RF_Standalone | RF_Transient |
+        RF_MarkAsNative | RF_MarkAsRootSet);
+    ConstructedClassObject->GetClassConstructor() = (std::function<void(const void*)>*)Class->Ctor;
+    std::function<UObject*(void*)>* VTableHelperCtorCaller = new std::function(VTableHelperCtor);
     ConstructedClassObject->GetClassVTableHelperCtorCaller() = VTableHelperCtorCaller;
 
     if (Unreal::Version::IsAtLeast(4, 24))
@@ -509,6 +518,9 @@ UClass* Suzie::UClass_Ctor(UClass* ParentClass, EClassFlags ClassFlags)
 
     if (Unreal::Version::IsAtLeast(4, 25))
     {
+        ConstructedClassObject->GetUnresolvedScriptProperties() = nullptr;
+        ConstructedClassObject->GetFirstOwnedClassRep() = 0;
+        ConstructedClassObject->GetScriptAndPropertyObjectReferences() = TArray<TObjectPtr<UObject>>();
         ConstructedClassObject->GetUnresolvedScriptProperties() = nullptr;
     }
 
@@ -523,8 +535,7 @@ UClass* Suzie::UClass_Ctor(UClass* ParentClass, EClassFlags ClassFlags)
 
     if (Unreal::Version::IsBelow(5, 1))
     {
-        std::function<void(UObject*, void*)>* ClassAddReferencedObjects = new std::function([](UObject*, void*) {});
-        ConstructedClassObject->GetClassAddReferencedObjects() = ClassAddReferencedObjects;
+        ConstructedClassObject->GetClassAddReferencedObjects() = (std::function<void(UObject*, void*)>*)ClassAddReferencedObjectsHelper;
     }
 
     ConstructedClassObject->GetClassUnique() = 0;
@@ -538,6 +549,18 @@ UClass* Suzie::UClass_Ctor(UClass* ParentClass, EClassFlags ClassFlags)
     ConstructedClassObject->GetDestructorLink() = nullptr;
     ConstructedClassObject->GetPostConstructLink() = nullptr;
     ConstructedClassObject->GetNext() = nullptr;
+    ConstructedClassObject->GetFuncMap() = TMap<FName, TObjectPtr<UFunction>>();
+    if (Unreal::Version::IsAtLeast(4, 18) && Unreal::Version::IsBelow(5, 3))
+    {
+        ConstructedClassObject->GetSuperFuncMap() = TMap<FName, UFunction*>();
+        ConstructedClassObject->GetSuperFuncMapLock() = UE::FPlatformRWLock();
+    }
+    ConstructedClassObject->GetInterfaces() = TArray<FImplementedInterface>();
+    ConstructedClassObject->GetNativeFunctionLookupTable() = TArray<FNativeFunctionLookup>();
+    ConstructedClassObject->GetScript() = TArray<unsigned char>();
+    ConstructedClassObject->GetClassPrivate() = nullptr;
+    ConstructedClassObject->GetNamePrivate() = FName();
+    ConstructedClassObject->GetOuterPrivate() = nullptr;
 
     return ConstructedClassObject;
 }
@@ -568,7 +591,7 @@ UClass* Suzie::FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Con
 
     EClassFlags ClassFlags = CLASS_Native | CLASS_Intrinsic | Class->ClassFlags;
 
-    UClass* ConstructedClassObject = UClass_Ctor(ParentClass, ClassFlags);
+    UClass* ConstructedClassObject = UClass_Ctor(ParentClass, Class, ClassFlags);
 
     //Set super structure and ClassWithin (they are required prior to registering)
     ConstructedClassObject->SetSuperStruct(ParentClass);

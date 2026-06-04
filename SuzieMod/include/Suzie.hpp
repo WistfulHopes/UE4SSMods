@@ -137,7 +137,7 @@ private:
     UFunction* FindOrCreateFunction(FDynamicClassGenerationContext& Context, const FDynamicFunction& Function);
     UFunction* FindOrCreateFunction(FDynamicClassGenerationContext& Context, const FString& FunctionPath);
 
-    UClass* UClass_Ctor(UClass* ParentClass, EClassFlags ClassFlags);
+    UClass* UClass_Ctor(UClass* ParentClass, FDynamicClass* Class, EClassFlags InClassFlags);
     
     bool ParseObjectConstructionData(const FDynamicClassGenerationContext& Context, const FString& ObjectPath, FDynamicObjectConstructionData& ObjectConstructionData);
     void CollectNestedDefaultSubobjectTypeOverrides(FDynamicClassGenerationContext& Context,
