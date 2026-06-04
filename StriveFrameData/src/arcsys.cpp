@@ -5,9 +5,9 @@
 #include <Unreal/World.hpp>
 #include "sigscan.h"
 
-RC::UClass* Class;
+UWorld** UWorld::GWorld = nullptr;
 
-UWorld** GWorld;
+RC::UClass* Class;
 
 using asw_scene_camera_transform_t = void (*)(const asw_scene*, SimpleFVector*, SimpleFVector*, SimpleFVector*);
 asw_scene_camera_transform_t asw_scene_camera_transform;
@@ -39,7 +39,7 @@ asw_entity_get_pushbox_t asw_entity_get_pushbox;
 void ASWInitFunctions() {
   auto GWorldPat = sigscan::get().scan("\x0F\x2E\x00\x74\x00\x48\x8B\x1D\x00\x00\x00\x00\x48\x85\xDB\x74", "xx?x?xxx????xxxx");
   auto GWorldAddr = *reinterpret_cast<uint32_t*>(GWorldPat + 8);
-  GWorld = reinterpret_cast<UWorld**>(GWorldPat + 12 + GWorldAddr);
+  UWorld::GWorld = reinterpret_cast<UWorld**>(GWorldPat + 12 + GWorldAddr);
 
   asw_scene_camera_transform = reinterpret_cast<asw_scene_camera_transform_t>(sigscan::get().scan("\x4D\x85\xC0\x74\x15\xF2\x41\x0F", "xxxxxxxx") - 0x56);
   asw_entity_is_active = reinterpret_cast<asw_entity_is_active_t>(sigscan::get().scan("\xF7\x81\x00\x00\x00\x00\x00\x00\x00\x04\x0F", "xx????xxxxx") - 0x12);
@@ -57,7 +57,7 @@ AREDGameState_Battle* getGameState() {
     Class = RC::UObjectGlobals::StaticFindObject<RC::UClass*>(nullptr, nullptr, STR("/Script/RED.REDGameState_Battle"));
   }
 
-  auto GameState = reinterpret_cast<AREDGameState_Battle*>((*GWorld)->GameState);
+  auto GameState = reinterpret_cast<AREDGameState_Battle*>((*UWorld::GWorld)->GameState);
 
   if (GameState == nullptr || !GameState->IsA(Class)) return nullptr;
   return GameState;

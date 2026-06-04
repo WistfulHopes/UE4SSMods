@@ -162,6 +162,7 @@ using funcUpdateReplay_t = void (*)(BattleReplayManager*);
 using funcSaveBackup_t = void (*)(asw_rollback*);
 using funcRollback_t = void (*)(asw_rollback*);
 using funcGetReplayManager_t = uintptr_t (*)();
+using funcUpdateOnPreTick_t = void (*)(AREDGameState_Battle*, float);
 
 // Hooks
 void hook_AHUDPostRender(void*);
@@ -230,6 +231,7 @@ funcSaveBackup_t orig_SaveBackup;
 funcRollback_t orig_Rollback;
 funcGetReplayManager_t orig_GetReplayManager;
 uintptr_t orig_GetNowKeyMappingBattle;
+funcUpdateOnPreTick_t orig_UpdateOnPreTick;
 
 // State Data
 UE4SSProgram* Program;
@@ -307,7 +309,7 @@ public:
 class Keybinds
 {
 public:
-    static const int BUTTON_COUNT = 14;
+    static const int BUTTON_COUNT = 13;
 
     int TOGGLE_FRAMEBAR_BUTTON = VK_F1;
     int TOGGLE_HITBOX_BUTTON = VK_F2;
@@ -319,7 +321,6 @@ public:
     int TAKEOVER_P1_BUTTON = VK_F7;
     int TAKEOVER_P2_BUTTON = VK_F8;
     int TOGGLE_LOAD_BUTTON = VK_F9;
-    int TOGGLE_REWIND_BUTTON = VK_F9;
 
     int MENU_UP_BUTTON = VK_UP;
     int MENU_DOWN_BUTTON = VK_DOWN;
@@ -328,7 +329,7 @@ public:
 
     int buttons[BUTTON_COUNT] = {
         TOGGLE_FRAMEBAR_BUTTON, TOGGLE_HITBOX_BUTTON, PAUSE_BUTTON, ADVANCE_BUTTON, TOGGLE_MENU_BUTTON,
-        TOGGLE_SAVE_BUTTON, TAKEOVER_P1_BUTTON, TAKEOVER_P2_BUTTON, TOGGLE_LOAD_BUTTON, TOGGLE_REWIND_BUTTON,
+        TOGGLE_SAVE_BUTTON, TAKEOVER_P1_BUTTON, TAKEOVER_P2_BUTTON, TOGGLE_LOAD_BUTTON,
         MENU_UP_BUTTON, MENU_DOWN_BUTTON, MENU_LEFT_BUTTON, MENU_RIGHT_BUTTON
     };
 
@@ -483,6 +484,8 @@ public:
 
     void restoreReplayHead() const
     {
+        if (!game_state.checkModeReplay()) return;
+        
         for (int i = 0; i < 6; i++)
         {
             manager->m_ReplayBuffer[i].m_ReadHead = replayHead[i];
@@ -500,6 +503,19 @@ public:
                     peer.m_ReadHead.m_Count--;
             }
             peer.m_ReadHead.m_SolidPosition--;
+        }
+    }
+    
+    void saveBackup()
+    {
+        if (isTakeover)
+        {
+            reset();
+        }
+        isTakeover = true;
+        for (int i = 0; i < 6; i++)
+        {
+            replayHead[i] = manager->m_ReplayBuffer[i].m_ReadHead;
         }
     }
 
@@ -548,25 +564,17 @@ public:
                 loadState = true;
             }
         }
-
-        if (keybindings.getButtonState(keybindings.TOGGLE_REWIND_BUTTON))
-        {
-            keybindings.resetButton(keybindings.TOGGLE_REWIND_BUTTON);
-            toggleRewind = !toggleRewind;
-        }
     }
 
     void reset()
     {
         isTakeover = false;
         loadState = false;
-        toggleRewind = false;
         analyzer = nullptr;
     }
 
     bool isTakeover = false;
     bool loadState = false;
-    bool toggleRewind = false;
     int roundCount = -1;
 } replay_manager;
 
@@ -584,8 +592,7 @@ public:
 
 class UeTracker
 {
-    Unreal::UObject* worldsets_actor = nullptr;
-    Unreal::FProperty* paused_prop = nullptr;
+    Unreal::AActor* paused = nullptr;
     bool renderingHooked = false;
 
     void hookFuncs()
@@ -605,29 +612,13 @@ class UeTracker
 
     void findProp()
     {
-        static auto input_class_name = Unreal::FName(STR("REDPlayerController_Battle"), Unreal::FNAME_Add);
-        static auto getworldsets_func_name = Unreal::FName(STR("K2_GetWorldSettings"), Unreal::FNAME_Add);
-
-        auto* input_actor = static_cast<Unreal::AActor*>(UObjectGlobals::FindFirstOf(input_class_name));
-        if (!input_actor) return;
-
-        auto* world_actor = input_actor->GetWorld();
-        if (!world_actor) return;
-
-        auto* getworldsets_func = world_actor->GetFunctionByNameInChain(getworldsets_func_name);
-        if (!getworldsets_func) return;
-
-        world_actor->ProcessEvent(getworldsets_func, &worldsets_actor);
-        if (!worldsets_actor) return;
-
-        paused_prop = worldsets_actor->GetPropertyByName(STR("PauserPlayerState"));
+        paused = (*UWorld::GWorld)->PersistentLevel->WorldSettings->PauserPlayerState;
     }
 
 public:
     void reset()
     {
-        worldsets_actor = nullptr;
-        paused_prop = nullptr;
+        paused = nullptr;
     }
 
     void setup()
@@ -640,10 +631,7 @@ public:
 
     bool isUePaused()
     {
-        if (!paused_prop) return false;
-        Unreal::AActor** val = static_cast<Unreal::AActor**>(paused_prop->ContainerPtrToValuePtr<
-            void>(worldsets_actor));
-        return (bool)val ? ((bool)*val) : false;
+        return paused != nullptr;
     }
 } tracker;
 
@@ -658,6 +646,8 @@ void hook_MatchStart(AREDGameState_Battle* GameState)
     pause_manager.reset();
     tracker.reset();
     replay_manager.reset();
+    
+    DrawTool::instance().matchStart();
     
     orig_MatchStart(GameState);
 }
@@ -704,33 +694,9 @@ void hook_UpdateBattle(AREDGameState_Battle* GameState, float DeltaTime)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(ModMenu::instance().delayAmount()));
 
-    keybindings.checkBinds(false);
     pause_manager.checkPause();
 
     if (game_state.checkModeReplay()) replay_manager.update();
-    else
-    {
-        if (keybindings.getButtonState(keybindings.TOGGLE_SAVE_BUTTON))
-        {
-            keybindings.resetButton(keybindings.TOGGLE_SAVE_BUTTON);
-            auto rollback = asw_rollback::get();
-            rollback->CurrentBackupDataIndex = 18;
-            orig_SaveBackup(rollback);
-        }
-        if (keybindings.getButtonState(keybindings.TOGGLE_LOAD_BUTTON))
-        {
-            keybindings.resetButton(keybindings.TOGGLE_LOAD_BUTTON);
-            auto rollback = asw_rollback::get();
-            rollback->CurrentBackupDataIndex = 0;
-            rollback->RollbackFrame = 1;
-            rollback->TotalRollbackFrames = 0;
-            auto backupData = rollback->BackupData[19];
-            orig_Rollback(rollback);
-            rollback->BackupData[19] = backupData;
-            rollback->RollbackFrame = 0;
-            rollback->TotalRollbackFrames = 0;
-        }
-    }
 
     if (ModMenu::instance().pauseType() == 0 && pause_manager.advancing()) return;
     if (ModMenu::instance().pauseType() == 1 && pause_manager.cinematicShouldAdvance()) return;
@@ -757,7 +723,6 @@ void hook_UpdateBattle(AREDGameState_Battle* GameState, float DeltaTime)
     if (game_state.matchStarted)
     {
         game_state.matchStarted = false;
-        DrawTool::instance().initialize();
         tracker.setup();
     }
 
@@ -797,21 +762,45 @@ void hook_UpdateReplay(BattleReplayManager* Manager)
 {
     if (replay_manager.isAnalyzerSame(nullptr))
         orig_UpdateReplay(Manager);
+}
 
-    if (replay_manager.loadState)
+void hook_UpdateOnPreTick(AREDGameState_Battle* pThis, float DeltaSeconds)
+{
+    keybindings.checkBinds(false);
+
+    if (game_state.checkMode())
     {
-        replay_manager.loadState = false;
-        auto rollback = asw_rollback::get();
-        rollback->CurrentBackupDataIndex = 0;
-        rollback->RollbackFrame = 1;
-        rollback->TotalRollbackFrames = 0;
-        auto backupData = rollback->BackupData[19];
-        orig_Rollback(rollback);
-        rollback->BackupData[19] = backupData;
-        rollback->RollbackFrame = 0;
-        rollback->TotalRollbackFrames = 0;
-        replay_manager.restoreReplayHead();
+        if (keybindings.getButtonState(keybindings.TOGGLE_SAVE_BUTTON))
+        {
+            keybindings.resetButton(keybindings.TOGGLE_SAVE_BUTTON);
+            auto rollback = asw_rollback::get();
+            rollback->CurrentBackupDataIndex = 18;
+            orig_SaveBackup(rollback);
+            
+            if (game_state.checkModeReplay())
+            {
+                replay_manager.saveBackup();
+            }
+        }
+        if (replay_manager.loadState || (!game_state.checkModeReplay()
+            && keybindings.getButtonState(keybindings.TOGGLE_LOAD_BUTTON)))
+        {
+            keybindings.resetButton(keybindings.TOGGLE_LOAD_BUTTON);
+            replay_manager.loadState = false;
+            auto rollback = asw_rollback::get();
+            rollback->CurrentBackupDataIndex = 0;
+            rollback->RollbackFrame = 1;
+            rollback->TotalRollbackFrames = 0;
+            auto backupData = rollback->BackupData[19];
+            orig_Rollback(rollback);
+            rollback->BackupData[19] = backupData;
+            rollback->RollbackFrame = 0;
+            rollback->TotalRollbackFrames = 0;
+            replay_manager.restoreReplayHead();
+        }
     }
+    
+    orig_UpdateOnPreTick(pThis, DeltaSeconds);
 }
 
 /* Mod Definition */
@@ -823,6 +812,7 @@ public:
     PLH::x64Detour* UpdateBattleInput_Detour;
     PLH::x64Detour* UpdateSystem_Detour;
     PLH::x64Detour* UpdateReplay_Detour;
+    PLH::x64Detour* UpdateOnPreTick_Detour;
 
     StriveFrameData()
         : CppUserModBase()
@@ -886,6 +876,13 @@ public:
         UpdateReplay_Detour = new PLH::x64Detour(UpdateReplay_Addr, reinterpret_cast<uint64_t>(&hook_UpdateReplay),
                                                  reinterpret_cast<uint64_t*>(&orig_UpdateReplay));
         UpdateReplay_Detour->hook();
+
+        const uint64_t UpdateOnPreTick_Addr = sigscan::get().scan(
+            "\xE8\x00\x00\x00\x00\x33\xED\xC6\x86",
+            "x????xxxx") - 0x45;
+        UpdateOnPreTick_Detour = new PLH::x64Detour(UpdateOnPreTick_Addr, reinterpret_cast<uint64_t>(&hook_UpdateOnPreTick),
+                                                 reinterpret_cast<uint64_t*>(&orig_UpdateOnPreTick));
+        UpdateOnPreTick_Detour->hook();
 
         const uintptr_t GetGameMode_Addr = sigscan::get().scan("\x0F\xB6\x81\xF0\x02\x00\x00\xC3", "xxxxxxxx");
         orig_GetGameMode = reinterpret_cast<funcGetGameMode_t>(GetGameMode_Addr);

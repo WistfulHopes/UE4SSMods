@@ -13,9 +13,24 @@ struct SimpleFVector {
 
 class AGameState : public RC::Unreal::AActor {};
 
+class AWorldSettings : public RC::Unreal::AActor
+{
+public:
+  FIELD(0x378, AActor*, PauserPlayerState);
+};
+
+class ULevel : public RC::Unreal::UObject
+{
+public:
+  FIELD(0x240, AWorldSettings*, WorldSettings);
+};
+
 class UWorld : public RC::Unreal::UObject {
 public:
+  FIELD(0x30, ULevel*, PersistentLevel);
   FIELD(0x130, AGameState*, GameState);
+
+  static UWorld** GWorld;
 };
 
 class AREDGameState_Battle : public AGameState {
