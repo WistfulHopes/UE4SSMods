@@ -5,6 +5,9 @@ project(${TARGET})
 
 set(${TARGET}_Sources
         "${CMAKE_CURRENT_SOURCE_DIR}/src/dllmain.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/REDGameMode_CharaSelectRE.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/REDGameState_CharaSelectRE.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/REDGameState.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/REDGameMode_CharaSelectRE.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/REDGameState_CharaSelectRE.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/safetyhook.cpp"

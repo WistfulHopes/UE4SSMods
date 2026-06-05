@@ -3,8 +3,8 @@
 #include <polyhook2/Exceptions/AVehHook.hpp>
 #include <Unreal/UObjectGlobals.hpp>
 
-#include "AActor.hpp"
 #include "BPMacros.hpp"
+#include "Globals.h"
 #include "REDGameMode_CharaSelectRE.h"
 #include "REDGameState.h"
 #include "REDGameState_CharaSelectRE.h"
@@ -52,7 +52,7 @@ namespace GGSTMods
                 [&](const SignatureContainer& self)
                 {
                     AREDGameState_CharaSelectRE::OnStartedLobbyTraining_Func.assign_address(self.get_match_address());
-                    return true;
+                    return false;
                 },
                 [](SignatureContainer& self)
                 {
@@ -63,7 +63,7 @@ namespace GGSTMods
                 [&](const SignatureContainer& self)
                 {
                     AREDGameState_CharaSelectRE::AREDHUD_FadeIn_Func.assign_address(self.get_match_address());
-                    return true;
+                    return false;
                 },
                 [](SignatureContainer& self)
                 {
@@ -75,7 +75,8 @@ namespace GGSTMods
                 {
                     auto func_addr = (uintptr_t)self.get_match_address() + 0x5 + (uintptr_t)*(uint32*)(self.
                         get_match_address() + 0x1);
-                    return true;
+                    ::GGSTUIRemake::QuadrantManager_GetInstance_Func.assign_address(reinterpret_cast<void*>(func_addr));
+                    return false;
                 },
                 [](SignatureContainer& self)
                 {
@@ -85,6 +86,7 @@ namespace GGSTMods
             std::vector<SignatureContainer> signature_containers;
             signature_containers.push_back(OnStartedLobbyTraining);
             signature_containers.push_back(AREDHUD_FadeIn);
+            signature_containers.push_back(QuadrantManager_GetInstance);
 
             SinglePassScanner::SignatureContainerMap signature_containers_map;
             signature_containers_map.emplace(ScanTarget::MainExe, signature_containers);
@@ -104,6 +106,17 @@ namespace GGSTMods
 
             if (const auto Suzie = LoadLibrary(STR("./ue4ss/Mods/SuzieMod/dlls/main.dll")))
             {
+                typedef int (*InsertStruct_t)(FString, FDynamicScriptStruct*);
+                if (const auto InsertStruct = reinterpret_cast<InsertStruct_t>(GetProcAddress(Suzie, "InsertStruct")))
+                {
+                    InsertStruct(FString(STR("/Script/REDExtend.DecideInfo")), &FDecideInfo::Data);
+                    InsertStruct(FString(STR("/Script/REDExtend.CharaSelectPlayerParam")),
+                                 &FCharaSelectPlayerParam::Data);
+                }
+                else
+                {
+                    Output::send<LogLevel::Error>(STR("Failed to find InsertStruct!"));
+                }
                 typedef int (*InsertClass_t)(FString, FDynamicClass*);
                 if (const auto InsertClass = reinterpret_cast<InsertClass_t>(GetProcAddress(Suzie, "InsertClass")))
                 {
@@ -116,17 +129,6 @@ namespace GGSTMods
                 {
                     Output::send<LogLevel::Error>(STR("Failed to find InsertClass!"));
                     return;
-                }
-                typedef int (*InsertStruct_t)(FString, FDynamicScriptStruct*);
-                if (const auto InsertStruct = reinterpret_cast<InsertStruct_t>(GetProcAddress(Suzie, "InsertStruct")))
-                {
-                    InsertStruct(FString(STR("/Script/REDExtend.DecideInfo")), &FDecideInfo::Data);
-                    InsertStruct(FString(STR("/Script/REDExtend.CharaSelectPlayerParam")),
-                                 &FCharaSelectPlayerParam::Data);
-                }
-                else
-                {
-                    Output::send<LogLevel::Error>(STR("Failed to find InsertClass!"));
                 }
                 typedef int (*InsertEnum_t)(FString, FDynamicEnum*);
                 if (const auto InsertEnum = reinterpret_cast<InsertEnum_t>(GetProcAddress(Suzie, "InsertEnum")))

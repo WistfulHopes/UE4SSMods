@@ -115,7 +115,13 @@ void AREDGameState_CharaSelectRE::SetPlayerParam(const int32 Side, FCharaSelectP
 
 void AREDGameState_CharaSelectRE::InitializeWidget()
 {
-    ProcessEvent(GetClassPrivate()->GetFunctionByNameInChain(FName(STR("InitializeWidget"))), nullptr);
+    auto Function = GetFunctionByNameInChain(FName(STR("InitializeWidget")));
+    if (!Function)
+    {
+        RC::Output::send(STR("Failed to find function InitializeWidget!"));
+        return;
+    }
+    ProcessEvent(Function, nullptr);
 }
 
 void AREDGameState_CharaSelectRE::BeginPlay()
