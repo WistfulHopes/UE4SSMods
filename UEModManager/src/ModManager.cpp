@@ -43,10 +43,11 @@ namespace RC::GUI::ModManager
     {
         FString PakFilename()
         {
-            if (Version::IsBelow(4, 27))
+            if (Version::IsEqual(4, 25))
                 return std::bit_cast<V425_FPakFile*>(this)->PakFilename;
-            else
+            if (Version::IsEqual(4, 27))
                 return std::bit_cast<V427_FPakFile*>(this)->PakFilename;
+            throw std::runtime_error("Unimplemented UE version");
         }
     };
 
@@ -83,18 +84,20 @@ namespace RC::GUI::ModManager
     {
         FPakPlatformFile* Pak()
         {
-            if (Version::IsBelow(4, 27))
+            if (Version::IsEqual(4, 25))
                 return std::bit_cast<V425_DelegateMount*>(this)->pak;
-            else
+            if (Version::IsEqual(4, 27))
                 return std::bit_cast<V427_DelegateMount*>(this)->pak;
+            throw std::runtime_error("Unimplemented UE version");
         }
 
         bool Call(FString& str, uint32_t order)
         {
-            if (Version::IsBelow(4, 27))
+            if (Version::IsEqual(4, 25))
                 return std::bit_cast<V425_DelegateMount*>(this)->fn(this->Pak(), str, order, nullptr);
-            else
+            if (Version::IsEqual(4, 27))
                 return std::bit_cast<V427_DelegateMount*>(this)->fn(this->Pak(), str, order);
+            throw std::runtime_error("Unimplemented UE version");
         }
     };
 
@@ -118,18 +121,20 @@ namespace RC::GUI::ModManager
     {
         FPakPlatformFile* Pak()
         {
-            if (Version::IsBelow(4, 27))
+            if (Version::IsEqual(4, 25))
                 return std::bit_cast<V425_DelegateUnmount*>(this)->pak;
-            else
+            if (Version::IsEqual(4, 27))
                 return std::bit_cast<V427_DelegateUnmount*>(this)->pak;
+            throw std::runtime_error("Unimplemented UE version");
         }
 
         bool Call(FString& str)
         {
-            if (Version::IsBelow(4, 27))
+            if (Version::IsEqual(4, 25))
                 return std::bit_cast<V425_DelegateUnmount*>(this)->fn(this->Pak(), str);
-            else
+            if (Version::IsEqual(4, 27))
                 return std::bit_cast<V427_DelegateUnmount*>(this)->fn(this->Pak(), str);
+            throw std::runtime_error("Unimplemented UE version");
         }
     };
 

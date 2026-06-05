@@ -189,16 +189,16 @@ LRESULT __stdcall WndProc(const HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     return CallWindowProc(oWndProc, hWnd, uMsg, wParam, lParam);
 }
 
-class GGSTModManager : public CppUserModBase
+class UEModManager : public CppUserModBase
 {
     static inline GUI::ModManager::ModManager m_pak_reloader{};
     std::thread d3d11_thread;
     static inline bool init = false;
 
 public:
-    GGSTModManager()
+    UEModManager()
     {
-        ModName = STR("GGST Mod Manager");
+        ModName = STR("UE Mod Manager");
         ModVersion = STR("1.0");
         ModDescription = STR("In-game mod manager for Guilty Gear -Strive-");
         ModAuthors = STR("WistfulHopes");
@@ -252,7 +252,7 @@ public:
     auto on_unreal_init() -> void override
     {
         m_pak_reloader.init();
-        d3d11_thread = std::thread(&GGSTModManager::init_d3d11, this);
+        d3d11_thread = std::thread(&UEModManager::init_d3d11, this);
 
         register_keydown_event(Input::M, {Input::ModifierKey::CONTROL}, [&]
         {
@@ -260,21 +260,21 @@ public:
         });
     }
     
-    ~GGSTModManager() override
+    ~UEModManager() override
     {
         kiero::shutdown();
     }
 };
 
-#define GGSTMODMANAGER_API __declspec(dllexport)
+#define UEMODMANAGER_API __declspec(dllexport)
 extern "C"
 {
-    GGSTMODMANAGER_API CppUserModBase* start_mod()
+    UEMODMANAGER_API CppUserModBase* start_mod()
     {
-        return new GGSTModManager();
+        return new UEModManager();
     }
 
-    GGSTMODMANAGER_API void uninstall_mod(CppUserModBase* mod)
+    UEMODMANAGER_API void uninstall_mod(CppUserModBase* mod)
     {
         delete mod;
     }

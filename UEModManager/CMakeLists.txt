@@ -1,6 +1,6 @@
-project(GGSTModManager)
+project(UEModManager)
 
-set(TARGET GGSTModManager)
+set(TARGET UEModManager)
 project(${TARGET})
 
 FetchContent_Declare(
