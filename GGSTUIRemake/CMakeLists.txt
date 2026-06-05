@@ -14,5 +14,5 @@ set(${TARGET}_Sources
         )
 
 add_library(${TARGET} SHARED ${${TARGET}_Sources})
-target_include_directories(${TARGET} PRIVATE "include")
+target_include_directories(${TARGET} PRIVATE "../SuzieMod/include" "include")
 target_link_libraries(${TARGET} PUBLIC UE4SS)

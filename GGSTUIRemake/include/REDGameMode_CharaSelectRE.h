@@ -2,7 +2,7 @@
 
 #include "AGameModeBase.hpp"
 #include "struct_util.h"
-#include "../../SuzieMod/include/Suzie.hpp"
+#include "Suzie.hpp"
 
 using CharType = wchar_t;
 using StringType = std::basic_string<CharType>;

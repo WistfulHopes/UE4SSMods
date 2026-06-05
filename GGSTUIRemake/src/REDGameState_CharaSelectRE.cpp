@@ -1,8 +1,8 @@
 #include "REDGameState_CharaSelectRE.h"
 
 #include "BPMacros.hpp"
-#include "../../SuzieMod/include/ScriptMacros.hpp"
-#include "../../SuzieMod/include/MiscMacros.hpp"
+#include "ScriptMacros.hpp"
+#include "MiscMacros.hpp"
 #include "Property/NumericPropertyTypes.hpp"
 
 IMPLEMENT_EXTERNAL_OBJECT_CLASS(AGameStateBase);

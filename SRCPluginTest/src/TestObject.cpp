@@ -1,5 +1,5 @@
 #include "TestObject.h"
-#include "../../SuzieMod/include/MiscMacros.hpp"
+#include "MiscMacros.hpp"
 
 IMPLEMENT_EXTERNAL_OBJECT_CLASS(UTestObject);
 

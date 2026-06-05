@@ -1,7 +1,7 @@
 #include "REDGameMode_CharaSelectRE.h"
 
 #include "REDGameState_CharaSelectRE.h"
-#include "../../SuzieMod/include/MiscMacros.hpp"
+#include "MiscMacros.hpp"
 
 IMPLEMENT_EXTERNAL_OBJECT_CLASS(AREDGameMode);
 IMPLEMENT_EXTERNAL_OBJECT_CLASS(AREDGameMode_CharaSelectRE);

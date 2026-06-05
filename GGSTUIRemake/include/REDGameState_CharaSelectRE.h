@@ -3,8 +3,7 @@
 #include "AActor.hpp"
 #include "Enums.h"
 #include "REDGameState.h"
-#include "struct_util.h"
-#include "../../SuzieMod/include/Suzie.hpp"
+#include "Suzie.hpp"
 
 using namespace RC::Unreal;
 
