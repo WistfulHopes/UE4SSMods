@@ -128,7 +128,10 @@ private:
     TMap<FString, FDynamicScriptStruct*> DynamicStructs {};
     TMap<FString, FDynamicEnum*> DynamicEnums {};
     TMap<FString, FDynamicFunction*> DynamicFunctions {};
-    
+
+    RC::Function<void*(UClass*, int32, FName, int32, int32, EClassFlags, EClassCastFlags, const TCHAR*, EObjectFlags,
+                       void (*)(const SuzieNamespace::FObjectInitializer*), UObject*(*)(void*), void (*)(UObject*, void*))> UClass_Ctor_Func {};
+
     UPackage* FindOrCreatePackage(const FString& PackageName);
     UClass* FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Context, const FString& ClassPath);
     UClass* FindOrCreateClass(FDynamicClassGenerationContext& Context, const FString& ClassPath);
@@ -155,6 +158,8 @@ private:
 
     FProperty* BuildProperty(FDynamicClassGenerationContext& Context, FFieldVariant Owner,
                              const FDynamicProperty& Property, EPropertyFlags ExtraPropertyFlags = CPF_None);
+
+    int32 SetupPropertyOffset(FProperty* Context, const FDynamicProperty& Property);
 
     UScriptStruct* GetSparseClassDataArchetypeStruct(UClass* Context);
 

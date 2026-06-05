@@ -2,6 +2,8 @@
 
 #include <Unreal/Property/FEnumProperty.hpp>
 #include <Unreal/Property/FFieldPathProperty.hpp>
+
+#include "PackageName.hpp"
 #include "UInterface.hpp"
 #include "UPackage.hpp"
 
@@ -43,7 +45,6 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
     // Remove the class from the pending construction set to prevent possible re-entry
     Context.ClassesPendingConstruction.Remove(NewClass);
 
-    TArray<const FProperty*> PropertiesWithDestructor;
     TArray<const FProperty*> PropertiesWithConstructor;
     uintptr_t* EmptyPropertyLinkArchive = (uintptr_t*)FMemory::Malloc(0x90);
 
@@ -69,13 +70,9 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
         {
             // Because this is a native class, we have to link the property offset manually here rather than expecting StaticLink to do it for us
             CreatedProperty->Link(*(FArchive*)EmptyPropertyLinkArchive);
+            NewClass->GetPropertiesSize() = SetupPropertyOffset(CreatedProperty, Property);
             NewClass->GetMinAlignment() = FMath::Max(NewClass->GetMinAlignment(), CreatedProperty->GetMinAlignment());
 
-            // Add property into the constructor/destructor lists based on its flags
-            if (!CreatedProperty->HasAnyPropertyFlags(CPF_IsPlainOldData | CPF_NoDestructor))
-            {
-                PropertiesWithDestructor.Add(CreatedProperty);
-            }
             if (!CreatedProperty->HasAnyPropertyFlags(CPF_ZeroConstructor))
             {
                 PropertiesWithConstructor.Add(CreatedProperty);
@@ -90,8 +87,7 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
     }
 
     // Bind parent class to this class and link properties to calculate their runtime derived data
-    NewClass->Bind();
-    NewClass->Link(*(FArchive*)EmptyPropertyLinkArchive, true);
+    NewClass->Link(*(FArchive*)EmptyPropertyLinkArchive, false);
     if (Unreal::Version::IsAtLeast(4, 24))
     {
         NewClass->GetSparseClassDataStruct() = GetSparseClassDataArchetypeStruct(NewClass);
@@ -226,11 +222,11 @@ UEnum* Suzie::FindOrCreateEnum(FDynamicClassGenerationContext& Context, const FS
         const int64 EnumConstantValue = Pair.Value;
 
         EnumNames.Add({FName(*EnumConstantName, FNAME_Add), EnumConstantValue});
-        bContainsFullyQualifiedNames |= std::wstring(EnumConstantName.GetCharArray().GetData()).contains(TEXT("::"));
+        bContainsFullyQualifiedNames |= std::wstring(EnumConstantName.GetCharArray().GetData()).contains(STR("::"));
     }
 
     // TODO: CppForm and Flags are not currently dumped, but we can assume flags None for most enums and guess CppForm based on names and CppType
-    const bool bCppTypeIsNamespaced = std::wstring(NewEnum->GetCppType().GetCharArray().GetData()).contains(TEXT("::"));
+    const bool bCppTypeIsNamespaced = std::wstring(NewEnum->GetCppType().GetCharArray().GetData()).contains(STR("::"));
     const UEnum::ECppForm EnumCppForm = bContainsFullyQualifiedNames
                                             ? (bCppTypeIsNamespaced
                                                    ? UEnum::ECppForm::Namespaced
@@ -498,6 +494,8 @@ UClass* Suzie::UClass_Ctor(UClass* ParentClass, FDynamicClass* Class, EClassFlag
     auto ConstructedClassObject = static_cast<UClass*>(UObjectBase::AllocateUObject(
         UClass::StaticClass()->GetStructureSize(), UClass::StaticClass()->GetMinAlignment(), true));
 
+    FMemory::Memzero(ConstructedClassObject, UClass::StaticClass()->GetStructureSize());
+    
     *(uintptr_t*)ConstructedClassObject = *(uintptr_t*)UClass::StaticClass();
     ConstructedClassObject->GetPropertiesSize() = ParentClass->GetStructureSize();
     ConstructedClassObject->GetMinAlignment() = ParentClass->GetMinAlignment();
@@ -510,27 +508,9 @@ UClass* Suzie::UClass_Ctor(UClass* ParentClass, FDynamicClass* Class, EClassFlag
     std::function<UObject*(void*)>* VTableHelperCtorCaller = new std::function(VTableHelperCtor);
     ConstructedClassObject->GetClassVTableHelperCtorCaller() = VTableHelperCtorCaller;
 
-    if (Unreal::Version::IsAtLeast(4, 24))
-    {
-        ConstructedClassObject->GetSparseClassData() = nullptr;
-        ConstructedClassObject->GetSparseClassDataStruct() = nullptr;
-    }
-
     if (Unreal::Version::IsAtLeast(4, 25))
     {
-        ConstructedClassObject->GetUnresolvedScriptProperties() = nullptr;
-        ConstructedClassObject->GetFirstOwnedClassRep() = 0;
         ConstructedClassObject->GetScriptAndPropertyObjectReferences() = TArray<TObjectPtr<UObject>>();
-        ConstructedClassObject->GetUnresolvedScriptProperties() = nullptr;
-    }
-
-    if (Unreal::Version::IsBelow(5, 0))
-    {
-        ConstructedClassObject->GetClassGeneratedBy() = nullptr;
-    }
-    else
-    {
-        ConstructedClassObject->GetbLayoutChanging() = false;
     }
 
     if (Unreal::Version::IsBelow(5, 1))
@@ -538,17 +518,6 @@ UClass* Suzie::UClass_Ctor(UClass* ParentClass, FDynamicClass* Class, EClassFlag
         ConstructedClassObject->GetClassAddReferencedObjects() = (std::function<void(UObject*, void*)>*)ClassAddReferencedObjectsHelper;
     }
 
-    ConstructedClassObject->GetClassUnique() = 0;
-    ConstructedClassObject->GetbCooked() = false;
-    ConstructedClassObject->GetNetFields() = {};
-    ConstructedClassObject->GetClassDefaultObject() = nullptr;
-    ConstructedClassObject->GetChildren() = nullptr;
-    ConstructedClassObject->GetChildProperties() = nullptr;
-    ConstructedClassObject->GetPropertyLink() = nullptr;
-    ConstructedClassObject->GetRefLink() = nullptr;
-    ConstructedClassObject->GetDestructorLink() = nullptr;
-    ConstructedClassObject->GetPostConstructLink() = nullptr;
-    ConstructedClassObject->GetNext() = nullptr;
     ConstructedClassObject->GetFuncMap() = TMap<FName, TObjectPtr<UFunction>>();
     if (Unreal::Version::IsAtLeast(4, 18) && Unreal::Version::IsBelow(5, 3))
     {
@@ -558,9 +527,7 @@ UClass* Suzie::UClass_Ctor(UClass* ParentClass, FDynamicClass* Class, EClassFlag
     ConstructedClassObject->GetInterfaces() = TArray<FImplementedInterface>();
     ConstructedClassObject->GetNativeFunctionLookupTable() = TArray<FNativeFunctionLookup>();
     ConstructedClassObject->GetScript() = TArray<unsigned char>();
-    ConstructedClassObject->GetClassPrivate() = nullptr;
     ConstructedClassObject->GetNamePrivate() = FName();
-    ConstructedClassObject->GetOuterPrivate() = nullptr;
 
     return ConstructedClassObject;
 }
@@ -590,7 +557,7 @@ UClass* Suzie::FindOrCreateUnregisteredClass(FDynamicClassGenerationContext& Con
     FindOrCreatePackage(PackageName);
 
     EClassFlags ClassFlags = CLASS_Native | CLASS_Intrinsic | Class->ClassFlags;
-
+    [[maybe_unused]] FName ClassNameAdd = FName(*ClassName);
     UClass* ConstructedClassObject = UClass_Ctor(ParentClass, Class, ClassFlags);
 
     //Set super structure and ClassWithin (they are required prior to registering)
@@ -854,7 +821,7 @@ FProperty* Suzie::BuildProperty(FDynamicClassGenerationContext& Context, FFieldV
         DelegateProperty->GetSignatureFunction() = SignatureFunction
                                                        ? SignatureFunction
                                                        : UObjectGlobals::FindObject<UFunction>(
-                                                           nullptr, TEXT(
+                                                           nullptr, STR(
                                                                "/Script/Engine.OnTimelineEvent__DelegateSignature"));
     }
     else if (FMulticastDelegateProperty* MulticastDelegateProperty = CastField<FMulticastDelegateProperty>(NewProperty))
@@ -864,7 +831,7 @@ FProperty* Suzie::BuildProperty(FDynamicClassGenerationContext& Context, FFieldV
         MulticastDelegateProperty->GetSignatureFunction() = SignatureFunction
                                                                 ? SignatureFunction
                                                                 : UObjectGlobals::FindObject<UFunction>(
-                                                                    nullptr, TEXT(
+                                                                    nullptr, STR(
                                                                         "/Script/Engine.OnTimelineEvent__DelegateSignature"));
     }
     else if (FFieldPathProperty* FieldPathProperty = CastField<FFieldPathProperty>(NewProperty))
@@ -898,6 +865,12 @@ FProperty* Suzie::BuildProperty(FDynamicClassGenerationContext& Context, FFieldV
     }
 
     return NewProperty;
+}
+
+int32 Suzie::SetupPropertyOffset(FProperty* Context, const FDynamicProperty& Property)
+{
+    Context->GetOffset_Internal() = Property.Offset;    
+    return Context->GetOffset_Internal() + Context->GetSize();
 }
 
 UScriptStruct* Suzie::GetSparseClassDataArchetypeStruct(UClass* Context)
