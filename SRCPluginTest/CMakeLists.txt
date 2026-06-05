@@ -1,0 +1,15 @@
+project(SRCPluginTest)
+
+set(TARGET SRCPluginTest)
+project(${TARGET})
+
+set(${TARGET}_Sources
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/dllmain.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/TestObject.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/TestObject.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/safetyhook.cpp"
+        )
+
+add_library(${TARGET} SHARED ${${TARGET}_Sources})
+target_include_directories(${TARGET} PRIVATE "include")
+target_link_libraries(${TARGET} PUBLIC UE4SS)
