@@ -3,7 +3,6 @@
 #include <Unreal/Property/FEnumProperty.hpp>
 #include <Unreal/Property/FFieldPathProperty.hpp>
 
-#include "PackageName.hpp"
 #include "UInterface.hpp"
 #include "UPackage.hpp"
 
@@ -50,15 +49,17 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
 
     struct FArchive_vtbl
     {
-        char _padding[0x170];
-        void* Preload;
+        char _padding[0x268];
     };
 
-    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x178);
+    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x268);
 
-    vtbl->Preload = []
+    for (int i = 0; i < 0x268; i += 8)
     {
-    };
+        *reinterpret_cast<void(**)()>((uintptr_t)vtbl + i) = []
+        {
+        };
+    }
     *EmptyPropertyLinkArchive = (uintptr_t)vtbl;
 
     // Add properties to the class
@@ -72,7 +73,7 @@ UClass* Suzie::FindOrCreateClass(FDynamicClassGenerationContext& Context, const 
             CreatedProperty->Link(*(FArchive*)EmptyPropertyLinkArchive);
             NewClass->GetPropertiesSize() = SetupPropertyOffset(CreatedProperty, Property);
             NewClass->GetMinAlignment() = FMath::Max(NewClass->GetMinAlignment(), CreatedProperty->GetMinAlignment());
-
+            
             if (!CreatedProperty->HasAnyPropertyFlags(CPF_ZeroConstructor))
             {
                 PropertiesWithConstructor.Add(CreatedProperty);
@@ -159,19 +160,22 @@ UScriptStruct* Suzie::FindOrCreateScriptStruct(FDynamicClassGenerationContext& C
 
     struct FArchive_vtbl
     {
-        char _padding[0x170];
-        void* Preload;
+        char _padding[0x268];
     };
 
-    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x178);
+    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x268);
 
-    vtbl->Preload = []
+    for (int i = 0; i < 0x268; i += 8)
     {
-    };
+        *reinterpret_cast<void(**)()>((uintptr_t)vtbl + i) = []
+        {
+        };
+    }
     *EmptyPropertyLinkArchive = (uintptr_t)vtbl;
 
     // Bind the newly created struct and link it to assign property offsets and calculate the size
     NewStruct->Bind();
+    NewStruct->PrepareCppStructOps();
     NewStruct->Link(*(FArchive*)EmptyPropertyLinkArchive, true);
 
     FMemory::Free(EmptyPropertyLinkArchive);
@@ -297,15 +301,17 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
 
     struct FArchive_vtbl
     {
-        char _padding[0x170];
-        void* Preload;
+        char _padding[0x268];
     };
 
-    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x178);
+    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x268);
 
-    vtbl->Preload = []
+    for (int i = 0; i < 0x268; i += 8)
     {
-    };
+        *reinterpret_cast<void(**)()>((uintptr_t)vtbl + i) = []
+        {
+        };
+    }
     *EmptyPropertyLinkArchive = (uintptr_t)vtbl;
 
     // Bind the function and calculate property layout and function locals size
@@ -380,15 +386,17 @@ UFunction* Suzie::FindOrCreateFunction(FDynamicClassGenerationContext& Context, 
 
     struct FArchive_vtbl
     {
-        char _padding[0x170];
-        void* Preload;
+        char _padding[0x268];
     };
 
-    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x178);
+    FArchive_vtbl* vtbl = (FArchive_vtbl*)FMemory::Malloc(0x268);
 
-    vtbl->Preload = []
+    for (int i = 0; i < 0x268; i += 8)
     {
-    };
+        *reinterpret_cast<void(**)()>((uintptr_t)vtbl + i) = []
+        {
+        };
+    }
     *EmptyPropertyLinkArchive = (uintptr_t)vtbl;
 
     // Bind the function and calculate property layout and function locals size
@@ -473,8 +481,9 @@ void Suzie::Initialize()
 
 UPackage* Suzie::FindOrCreatePackage(const FString& PackageName)
 {
-    UPackage* Package = UObjectGlobals::NewObject<UPackage>(nullptr, FName(*PackageName, FNAME_Add));
-    *reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(Package) + 0x50) = 0x10;
+    UPackage* Package = UObjectGlobals::FindObject<UPackage>(nullptr, *PackageName);
+    if (!Package)
+        Package = UObjectGlobals::NewObject<UPackage>(nullptr, FName(*PackageName));
     return Package;
 }
 
@@ -757,7 +766,7 @@ FProperty* Suzie::BuildProperty(FDynamicClassGenerationContext& Context, FFieldV
     const FString PropertyType = Property.Type;
 
     FProperty* NewProperty = CastField<FProperty>(
-        FField::Construct(FName(*PropertyType, FNAME_Add), Owner, FName(*PropertyName, FNAME_Add), RF_Public));
+        FField::Construct(FName(*PropertyType), Owner, FName(*PropertyName, FNAME_Add), RF_Public));
     if (NewProperty == nullptr)
     {
         Output::send<LogLevel::Error>(

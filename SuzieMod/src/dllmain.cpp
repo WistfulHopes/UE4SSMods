@@ -3,7 +3,6 @@
 #include <Mod/CppUserModBase.hpp>
 #include <UE4SSProgram.hpp>
 
-#include "Hooks.hpp"
 #include "Suzie.hpp"
 
 class SuzieMod : public RC::CppUserModBase
