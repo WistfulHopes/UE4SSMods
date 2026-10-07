@@ -1,150 +1,151 @@
-﻿#include "Pawn.hpp"
+#include "Pawn.hpp"
 #include "BattleState.hpp"
+#include "RollbackContext.hpp"
 
 RC::Unreal::UClass* AREDPawnEffect::StaticClass = nullptr;
 
+namespace
+{
+	RC::Unreal::int32 GetPawnPlayerIdx(const OBJ_CBase* Obj)
+	{
+		return Obj->m_pParentPly ? Obj->m_SideID * 3 + Obj->m_MemberID : 6;
+	}
+}
+
 bool Rollback_ProcessCachedPawn(OBJ_CBase* ctx, CXXBYTE<32>* name, bool isCommon, bool effect, bool self)
 {
-    if (!bIsRollback && !bIsSave) return false;
-	
+	auto& Ctx = GetRollbackContext();
+
+	if (!Ctx.bIsFastForward && !Ctx.bIsSave) return false;
+
 	AREDPawn* pawn = nullptr;
-	if (bIsRollback)
+	if (Ctx.bIsFastForward)
 	{
 		if (ctx->m_pPawn)
 		{
-			const auto iter = objData.find(ctx);
-			if (iter->second.m_RollbackData.LinkPawnName == *name)
+			if (Ctx.GetObjExt(ctx).m_RollbackData.LinkPawnName == *name)
 			{
 				return true;
 			}
-			
-			ClearLinkModel(ctx);			
+
+			ClearLinkModel(ctx);
 		}
-		
+
 		if (*name == "")
 			return true;
-		
+
 		pawn = GetCachedPawn(ctx, name);
 	}
 	else
 	{
 		pawn = GetCachedPawnForSet(ctx);
 	}
-	
+
 	if (!pawn)
 	{
 		ClearLinkModel(ctx);
 		return false;
 	}
-	else
+
+	auto& Ext = Ctx.GetObjExt(ctx);
+
+	pawn->ObjPtr = ctx;
+	ctx->m_pPawn = pawn;
+	ctx->m_PawnName = Ext.m_RollbackData.LinkPawnName;
+	SetActorHiddenInGame(pawn, false);
+	pawn->bIgnoreTick = false;
+	SetActorTickEnabled(pawn, true);
+
+	if (!Ext.m_RollbackData.LinkPawnSet)
 	{
-		pawn->ObjPtr = ctx;
-		ctx->m_pPawn = pawn;
-		const auto iter = objData.find(ctx);
-		ctx->m_PawnName = iter->second.m_RollbackData.LinkPawnName;
-		SetActorHiddenInGame(pawn, false);
-		pawn->bIgnoreTick = false;
-		SetActorTickEnabled(pawn, true);
-		
-		if (!iter->second.m_RollbackData.LinkPawnSet)
-		{
-			iter->second.m_RollbackData.LinkPawnName = *name;
-			iter->second.m_RollbackData.LinkCommonPawn = isCommon;
-			iter->second.m_RollbackData.LinkCommonPawnEffect = effect;
-			iter->second.m_RollbackData.LinkCommonPawnSelf = self;
-			iter->second.m_RollbackData.LinkPawnStartFrame = GameFrame;
-			iter->second.m_RollbackData.LinkPawnActName = ctx->m_CurActionName;			
-		}
+		Ext.m_RollbackData.LinkPawnName = *name;
+		Ext.m_RollbackData.LinkCommonPawn = isCommon;
+		Ext.m_RollbackData.LinkCommonPawnEffect = effect;
+		Ext.m_RollbackData.LinkCommonPawnSelf = self;
+		Ext.m_RollbackData.LinkPawnStartFrame = Ctx.GameFrame;
+		Ext.m_RollbackData.LinkPawnActName = ctx->m_CurActionName;
 	}
-	
+
 	return true;
 }
 
 FPawnCacheKey MakePawnKeyFromObj(OBJ_CBase* obj, CXXBYTE<32>* name, RC::Unreal::int32 Count)
 {
-	RC::Unreal::int32 player = 6;
-	
-	if (obj->m_pParentPly)
-	{
-		player = obj->m_SideID * 3 + obj->m_MemberID;
-	}
-	
-	return FPawnCacheKey{player, GameFrame, obj->m_CurActionName, *name, Count};
+	auto& Ctx = GetRollbackContext();
+
+	return FPawnCacheKey{GetPawnPlayerIdx(obj), Ctx.GameFrame, obj->m_CurActionName, *name, Count};
 }
 
 FPawnCacheKey MakePawnKeyFromRBData(OBJ_CBase* obj, RC::Unreal::int32 Count)
 {
-	RC::Unreal::int32 player = 6;
+	auto& Ctx = GetRollbackContext();
 
-	if (obj->m_pParentPly)
-	{
-		player = obj->m_SideID * 3 + obj->m_MemberID;
-	}
-	const auto iter = objData.find(obj);
-	if (iter != objData.end())
-	{
-		return FPawnCacheKey{ player, iter->second.m_RollbackData.LinkPawnStartFrame, iter->second.m_RollbackData.LinkPawnActName, iter->second.m_RollbackData.LinkPawnName, Count };
-	}
-	
-	return FPawnCacheKey{ player, 0, "", "", Count };
+	if (Ctx.GetObjSlot(obj) == InvalidSlot)
+		return FPawnCacheKey{GetPawnPlayerIdx(obj), 0, "", "", Count};
+
+	const auto& Data = Ctx.GetObjExt(obj).m_RollbackData;
+	return FPawnCacheKey{
+		GetPawnPlayerIdx(obj), Data.LinkPawnStartFrame, Data.LinkPawnActName, Data.LinkPawnName, Count
+	};
 }
 
 AREDPawn* GetCachedPawn(OBJ_CBase* ctx, CXXBYTE<32>* name)
 {
-	int i = 0;
-	while (i < 10)
+	auto& Ctx = GetRollbackContext();
+
+	for (int i = 0; i < 10; i++)
 	{
 		auto key = MakePawnKeyFromObj(ctx, name, i);
-		const auto iter = pawnRollbackData.pawnCache.find(key);
-		if (iter != pawnRollbackData.pawnCache.end())
+		const auto iter = Ctx.Pawns.pawnCache.find(key);
+		if (iter != Ctx.Pawns.pawnCache.end())
 		{
 			auto result = iter->second;
-			pawnRollbackData.pawnCache.erase(iter);
+			Ctx.Pawns.pawnCache.erase(iter);
 			return result;
 		}
-		i++;
 	}
 	return nullptr;
 }
 
 AREDPawn* GetCachedPawnForSet(OBJ_CBase* ctx)
 {
-	int i = 0;
-	while (i < 10)
+	auto& Ctx = GetRollbackContext();
+
+	for (int i = 0; i < 10; i++)
 	{
 		auto key = MakePawnKeyFromRBData(ctx, i);
-		const auto iter = pawnRollbackData.pawnCache.find(key);
-		if (iter != pawnRollbackData.pawnCache.end())
+		const auto iter = Ctx.Pawns.pawnCache.find(key);
+		if (iter != Ctx.Pawns.pawnCache.end())
 		{
 			auto result = iter->second;
-			pawnRollbackData.pawnCache.erase(iter);
+			Ctx.Pawns.pawnCache.erase(iter);
 			return result;
 		}
-		i++;
 	}
 	return nullptr;
 }
 
 bool AddLinkPawnToCache(OBJ_CBase* ctx)
 {
-	int i = 0;
-	while (i < 10)
+	auto& Ctx = GetRollbackContext();
+
+	for (int i = 0; i < 10; i++)
 	{
 		auto key = MakePawnKeyFromRBData(ctx, i);
-		const auto iter = pawnRollbackData.pawnCache.find(key);
-		if (iter == pawnRollbackData.pawnCache.end())
+		if (!Ctx.Pawns.pawnCache.contains(key))
 		{
-			pawnRollbackData.pawnCache.insert(std::pair(key, ctx->m_pPawn));
+			Ctx.Pawns.pawnCache.insert(std::pair(key, ctx->m_pPawn));
 			return true;
 		}
-		i++;
 	}
 	return false;
 }
 
 bool AddLinkPawnForQuickRestore(OBJ_CBase* ctx)
 {
-	for (auto& pawn : pawnRollbackData.PawnQuickRestoreCache)
+	auto& Ctx = GetRollbackContext();
+
+	for (auto& pawn : Ctx.Pawns.PawnQuickRestoreCache)
 	{
 		if (!pawn)
 		{
@@ -157,15 +158,18 @@ bool AddLinkPawnForQuickRestore(OBJ_CBase* ctx)
 
 void QuickRestoreLinkPawns()
 {
-	for (auto pawn : pawnRollbackData.PawnQuickRestoreCache)
+	auto& Ctx = GetRollbackContext();
+
+	for (auto pawn : Ctx.Pawns.PawnQuickRestoreCache)
 	{
 		if (!pawn) break;
-		
+
 		auto obj = pawn->ObjPtr;
-		pawn->ObjPtr = obj;
+		if (!obj) continue;
+
 		obj->m_pPawn = pawn;
-		obj->m_PawnName = objData[obj].m_RollbackData.LinkPawnName;
+		obj->m_PawnName = Ctx.GetObjExt(obj).m_RollbackData.LinkPawnName;
 	}
-	
-	RC::Unreal::FMemory::Memzero(pawnRollbackData.PawnQuickRestoreCache);
+
+	RC::Unreal::FMemory::Memzero(Ctx.Pawns.PawnQuickRestoreCache);
 }

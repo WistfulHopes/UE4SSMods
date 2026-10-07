@@ -1,503 +1,234 @@
 #include "BattleState.hpp"
+#include "RollbackContext.hpp"
 #include "Unreal.hpp"
+#include "lz4.h"
 
-int GameFrame = 0;
-AA_CRandMT* Random = nullptr;
+#include <vector>
 
-RollbackData::~RollbackData()
+namespace
 {
-	RC::Unreal::FMemory::Free(ObjManager);
-	RC::Unreal::FMemory::Free(ScrManager);
-	RC::Unreal::FMemory::Free(State);
-	RC::Unreal::FMemory::Free(EvtManager);
-	RC::Unreal::FMemory::Free(BtlEvent);
-	StoredObjData.clear();
+	constexpr uint16_t BattleEventSizes[BEMCount + 1] = {
+		0x28, 0x30, 0x30, 0x30, 0x28, 0x30, 0x000, 0x48,
+		0x50, 0x58, 0x50, 0x50, 0x28, 0x000, 0x50, 0x40,
+		0x38, 0x30, 0x28, 0x40, 0x28, 0x88, 0x88, 0x30,
+		0x40, 0x40, 0x38, 0x58, 0x30, 0x178, 0x68, 0x30,
+		0x30, 0x40, 0x30, 0x28, 0x48, 0x30, 0x38, 0x38,
+		0x28, 0x28,
+	};
+
+	static_assert(std::size(BattleEventSizes) == BEMCount + 1);
 }
 
-void RollbackData::SaveObj(BATTLE_CObjectManager* InObjManager)
+size_t GetBattleEventSize(uint32_t BEMState)
 {
-	for (int i = 0; i < 400; i++)
-	{
-        if (InObjManager->m_ObjVector[i].m_ActiveState != ACTV_NOT_ACTIVE)
-        {
-            std::memcpy(&ObjManager->m_ObjVector[i].ObjBaseSyncBegin, &InObjManager->m_ObjVector[i].ObjBaseSyncBegin, sizeof(OBJ_CBase) - 8);
-        	auto& from = objData[&ObjManager->m_ObjVector[i]];
-        	auto& to = StoredObjData[&ObjManager->m_ObjVector[i]];
-        	std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
-        }
-	}
+	if (BEMState > BEMCount)
+		return 0;
+
+	return BattleEventSizes[BEMState];
 }
 
-void RollbackData::SaveChara(BATTLE_CObjectManager* InObjManager)
+void RollbackData::SaveState(RollbackContext& Ctx)
 {
-	for (int i = 0; i < 6; i++)
-	{
-        std::memcpy(&ObjManager->m_CharVector[i].ObjBaseSyncBegin, &InObjManager->m_CharVector[i].ObjBaseSyncBegin, sizeof(OBJ_CCharBase) - 8);
-		auto& from = objData[&ObjManager->m_CharVector[i]];;
-		auto& to = StoredObjData[&ObjManager->m_CharVector[i]];
-       	std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
-	}
-}
+	auto* GameState = Ctx.GameState;
+	auto* Manager = GameState->BattleObjectManager;
 
-void RollbackData::SaveStage(BATTLE_CObjectManager* InObjManager)
-{
-	for (int i = 0; i < 10; i++)
-	{
-		std::memcpy(&ObjManager->m_StageVector[i].ObjBaseSyncBegin, &InObjManager->m_StageVector[i].ObjBaseSyncBegin, sizeof(OBJ_CStageBase) - 8);
-		auto& from = objData[&ObjManager->m_StageVector[i]];
-		auto& to = StoredObjData[&ObjManager->m_StageVector[i]];
-		std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
-	}
-}
+	std::memcpy(ObjManagerHead, reinterpret_cast<const char*>(Manager) + ObjManagerHeadOffset, ObjManagerHeadSize);
+	std::memcpy(ObjManagerTail, reinterpret_cast<const char*>(Manager) + ObjManagerTailOffset, ObjManagerTailSize);
 
-void RollbackData::SaveState(AREDGameState_Battle* GameState) {
-	if (ObjManager == nullptr)
-		ObjManager = static_cast<BATTLE_CObjectManager*>(RC::Unreal::FMemory::Malloc(sizeof(BATTLE_CObjectManager)));
-	std::memcpy(reinterpret_cast<char*>(ObjManager) + 8, reinterpret_cast<char*>(GameState->BattleObjectManager) + 8, 0x83C0);
-    std::memcpy(reinterpret_cast<char*>(ObjManager) + 0x12637E0, reinterpret_cast<char*>(GameState->BattleObjectManager) + 0x12637E0, 0x23BF0);
-    SaveObj(GameState->BattleObjectManager);
-    SaveChara(GameState->BattleObjectManager);
-    SaveStage(GameState->BattleObjectManager);
-	if (ScrManager == nullptr)
-		ScrManager = static_cast<BATTLE_CScreenManager*>(RC::Unreal::FMemory::Malloc(sizeof(BATTLE_CScreenManager)));
-	std::memcpy(ScrManager, GameState->BattleScreenManager, sizeof(BATTLE_CScreenManager));
-	if (State == nullptr)
-		State = static_cast<BattleState*>(RC::Unreal::FMemory::Malloc(sizeof(BattleState)));
-	std::memcpy(reinterpret_cast<char*>(State) + 8, reinterpret_cast<char*>(GameState->State) + 8, sizeof(BattleState));
-	if (EvtManager == nullptr)
-		EvtManager = static_cast<BattleEventManager*>(RC::Unreal::FMemory::Malloc(sizeof(BattleEventManager)));
-	std::memcpy(reinterpret_cast<char*>(EvtManager) + 8, reinterpret_cast<char*>(GameState->EventManager) + 8, sizeof(BattleEventManager));
-
-	if (BtlEvent)
+	for (int32_t i = 0; i < ObjCount; i++)
 	{
-		if (GameState->EventManager->m_CurrentBEMState <= 41)
+		bObjActive[i] = Manager->m_ObjVector[i].m_ActiveState != ACTV_NOT_ACTIVE;
+		if (bObjActive[i])
 		{
-			RC::Unreal::FMemory::Free(BtlEvent);
-			BtlEvent = nullptr;
+			std::memcpy(Obj[i], reinterpret_cast<const char*>(&Manager->m_ObjVector[i]) + SyncSkipOffset, sizeof(Obj[i]));
 		}
 	}
-	
+
+	for (int32_t i = 0; i < CharCount; i++)
+		std::memcpy(Chara[i], reinterpret_cast<const char*>(&Manager->m_CharVector[i]) + SyncSkipOffset, sizeof(Chara[i]));
+
+	for (int32_t i = 0; i < StageCount; i++)
+		std::memcpy(Stage[i], reinterpret_cast<const char*>(&Manager->m_StageVector[i]) + SyncSkipOffset, sizeof(Stage[i]));
+
+	std::memcpy(ObjExt, Ctx.ObjExt, sizeof(ObjExt));
+
+	std::memcpy(ScrManager, GameState->BattleScreenManager, sizeof(ScrManager));
+	std::memcpy(State, reinterpret_cast<const char*>(GameState->State) + SyncSkipOffset, sizeof(State));
+	std::memcpy(EvtManager, reinterpret_cast<const char*>(GameState->EventManager) + SyncSkipOffset, sizeof(EvtManager));
+
+	BattleEventState = static_cast<uint32_t>(GameState->EventManager->m_CurrentBEMState);
+	BattleEventSize = 0;
+	std::memset(BattleEvent, 0, sizeof(BattleEvent));
+
 	if (GameState->EventManager->m_pBattleEvent)
 	{
-		switch (GameState->EventManager->m_CurrentBEMState)
+		if (const size_t Size = GetBattleEventSize(BattleEventState))
 		{
-		case 0:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x28);
-			break;
-		case 1:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 2:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 3:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 4:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x28);
-			break;
-		case 5:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 7:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x48);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x48);
-			break;
-		case 8:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x50);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x50);
-			break;
-		case 9:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x58);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x58);
-			break;
-		case 10:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x50);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x50);
-			break;
-		case 11:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x50);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x50);
-			break;
-		case 12:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x28);
-			break;
-		case 14:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x50);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x50);
-			break;
-		case 15:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x40);
-			break;
-		case 16:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x38);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x38);
-			break;
-		case 17:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 18:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x28);
-			break;
-		case 19:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x40);
-			break;
-		case 20:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x28);
-			break;
-		case 21:
-		case 22:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x88);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x88);
-			break;
-		case 23:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 24:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x40);
-			break;
-		case 25:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x40);
-			break;
-		case 26:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x38);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x38);
-			break;
-		case 27:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x58);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x58);
-			break;
-		case 28:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 29:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x178);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x178);
-			break;
-		case 30:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x68);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x68);
-			break;
-		case 31:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 32:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 33:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x40);
-			break;
-		case 34:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 35:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x28);
-			break;
-		case 36:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x48);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x48);
-			break;
-		case 37:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x30);
-			break;
-		case 38:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x38);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x38);
-			break;
-		case 39:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x38);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x38);
-			break;
-		case 40:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x28);
-			break;
-		case 41:
-			BtlEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(BtlEvent, GameState->EventManager->m_pBattleEvent, 0x28);
-			break;
-		default:
-			break;
+			std::memcpy(BattleEvent, GameState->EventManager->m_pBattleEvent, Size);
+			BattleEventSize = static_cast<uint32_t>(Size);
 		}
 	}
-	
-	CamRollbackData.m_Pos = GameState->BattleScreenManager->m_pCamera->m_Pos;
-	CamRollbackData.m_Up = GameState->BattleScreenManager->m_pCamera->m_Up;
-	CamRollbackData.m_At = GameState->BattleScreenManager->m_pCamera->m_At;
-	BGRollbackData.m_OffsetMatrix = GameState->BGLocation->m_OffsetMatrix;
-	BGRollbackData.m_OffsetMove_Location = GameState->BGLocation->m_OffsetMove_Location;
-	BGRollbackData.m_OffsetMove_Rotation = GameState->BGLocation->m_OffsetMove_Rotation;
-	std::memcpy(RandomRollbackData.m_State, Random->m_State, 4 * 624);
-	RandomRollbackData.m_Left = Random->m_Left;
-	RandomRollbackData.m_Initf = Random->m_Initf;
-	RandomRollbackData.m_pNext = Random->m_pNext;
-	SavedGameFrame = GameFrame;
+
+	Cam.m_Pos = GameState->BattleScreenManager->m_pCamera->m_Pos;
+	Cam.m_Up = GameState->BattleScreenManager->m_pCamera->m_Up;
+	Cam.m_At = GameState->BattleScreenManager->m_pCamera->m_At;
+
+	BG.m_OffsetMatrix = GameState->BGLocation->m_OffsetMatrix;
+	BG.m_OffsetMove_Location = GameState->BGLocation->m_OffsetMove_Location;
+	BG.m_OffsetMove_Rotation = GameState->BGLocation->m_OffsetMove_Rotation;
+
+	if (Ctx.Random)
+	{
+		std::memcpy(Rand.m_State, Ctx.Random->m_State, sizeof(Rand.m_State));
+		Rand.m_Left = Ctx.Random->m_Left;
+		Rand.m_Initf = Ctx.Random->m_Initf;
+		Rand.m_pNext = Ctx.Random->m_pNext;
+	}
+
+	SavedGameFrame = Ctx.GameFrame;
+	Inputs[0] = Ctx.Inputs[0];
+	Inputs[1] = Ctx.Inputs[1];
 }
 
-void RollbackData::LoadObj(BATTLE_CObjectManager* InObjManager)
+void RollbackData::LoadState(RollbackContext& Ctx)
 {
-	for (int i = 0; i < 400; i++)
+	auto* GameState = Ctx.GameState;
+	auto* Manager = GameState->BattleObjectManager;
+
+	std::memcpy(reinterpret_cast<char*>(Manager) + ObjManagerHeadOffset, ObjManagerHead, ObjManagerHeadSize);
+	std::memcpy(reinterpret_cast<char*>(Manager) + ObjManagerTailOffset, ObjManagerTail, ObjManagerTailSize);
+
+	for (int32_t i = 0; i < ObjCount; i++)
 	{
-		if (ObjManager->m_ObjVector[i].m_ActiveState != ACTV_NOT_ACTIVE)
-		{
-			std::memcpy(&InObjManager->m_ObjVector[i].ObjBaseSyncBegin, &ObjManager->m_ObjVector[i].ObjBaseSyncBegin, sizeof(OBJ_CBase) - 8);
-			auto& from = StoredObjData[&ObjManager->m_ObjVector[i]];
-			auto& to = objData[&ObjManager->m_ObjVector[i]];
-       		std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
-		}
+		if (bObjActive[i])
+			std::memcpy(reinterpret_cast<char*>(&Manager->m_ObjVector[i]) + SyncSkipOffset, Obj[i], sizeof(Obj[i]));
 		else
+			Manager->m_ObjVector[i].m_ActiveState = ACTV_NOT_ACTIVE;
+	}
+
+	for (int32_t i = 0; i < CharCount; i++)
+		std::memcpy(reinterpret_cast<char*>(&Manager->m_CharVector[i]) + SyncSkipOffset, Chara[i], sizeof(Chara[i]));
+
+	for (int32_t i = 0; i < StageCount; i++)
+		std::memcpy(reinterpret_cast<char*>(&Manager->m_StageVector[i]) + SyncSkipOffset, Stage[i], sizeof(Stage[i]));
+
+	std::memcpy(Ctx.ObjExt, ObjExt, sizeof(ObjExt));
+
+	std::memcpy(GameState->BattleScreenManager, ScrManager, sizeof(ScrManager));
+	std::memcpy(reinterpret_cast<char*>(GameState->State) + SyncSkipOffset, State, sizeof(State));
+
+	void* LiveBattleEvent = GameState->EventManager->m_pBattleEvent;
+
+	std::memcpy(reinterpret_cast<char*>(GameState->EventManager) + SyncSkipOffset, EvtManager, sizeof(EvtManager));
+
+	if (LiveBattleEvent)
+		RC::Unreal::FMemory::Free(LiveBattleEvent);
+
+	GameState->EventManager->m_pBattleEvent = nullptr;
+
+	if (BattleEventSize)
+	{
+		void* Event = RC::Unreal::FMemory::Malloc(BattleEventSize);
+		std::memcpy(Event, BattleEvent, BattleEventSize);
+		GameState->EventManager->m_pBattleEvent = Event;
+	}
+
+	GameState->BattleScreenManager->m_pCamera->m_Pos = Cam.m_Pos;
+	GameState->BattleScreenManager->m_pCamera->m_Up = Cam.m_Up;
+	GameState->BattleScreenManager->m_pCamera->m_At = Cam.m_At;
+
+	GameState->BGLocation->m_OffsetMatrix = BG.m_OffsetMatrix;
+	GameState->BGLocation->m_OffsetMove_Location = BG.m_OffsetMove_Location;
+	GameState->BGLocation->m_OffsetMove_Rotation = BG.m_OffsetMove_Rotation;
+
+	if (Ctx.Random)
+	{
+		std::memcpy(Ctx.Random->m_State, Rand.m_State, sizeof(Rand.m_State));
+		Ctx.Random->m_Left = Rand.m_Left;
+		Ctx.Random->m_Initf = Rand.m_Initf;
+		Ctx.Random->m_pNext = Rand.m_pNext;
+	}
+
+	Ctx.GameFrame = SavedGameFrame;
+	Ctx.Inputs[0] = Inputs[0];
+	Ctx.Inputs[1] = Inputs[1];
+}
+
+namespace
+{
+	constexpr size_t FixedRegionSize = offsetof(RollbackData, Obj);
+	constexpr size_t ObjPayloadSize = sizeof(RollbackData::Obj[0]);
+
+	std::vector<uint8_t>& PackBuffer()
+	{
+		static std::vector<uint8_t> Buffer(sizeof(RollbackData));
+		return Buffer;
+	}
+
+	size_t PackSnapshot(const RollbackData& Snapshot, uint8_t* Dst)
+	{
+		std::memcpy(Dst, &Snapshot, FixedRegionSize);
+		size_t Out = FixedRegionSize;
+
+		for (int32_t i = 0; i < ObjCount; i++)
 		{
-			InObjManager->m_ObjVector[i].m_ActiveState = ACTV_NOT_ACTIVE;
+			if (!Snapshot.bObjActive[i])
+				continue;
+
+			std::memcpy(Dst + Out, Snapshot.Obj[i], ObjPayloadSize);
+			Out += ObjPayloadSize;
 		}
+
+		return Out;
+	}
+
+	bool UnpackSnapshot(RollbackData& Snapshot, const uint8_t* Src, size_t Size)
+	{
+		if (Size < FixedRegionSize)
+			return false;
+
+		std::memcpy(&Snapshot, Src, FixedRegionSize);
+		size_t In = FixedRegionSize;
+
+		for (int32_t i = 0; i < ObjCount; i++)
+		{
+			if (!Snapshot.bObjActive[i])
+				continue;
+
+			if (In + ObjPayloadSize > Size)
+				return false;
+
+			std::memcpy(Snapshot.Obj[i], Src + In, ObjPayloadSize);
+			In += ObjPayloadSize;
+		}
+
+		return In == Size;
 	}
 }
 
-void RollbackData::LoadChara(BATTLE_CObjectManager* InObjManager)
+size_t RollbackData::PackedSize() const
 {
-	for (int i = 0; i < 6; i++)
-	{
-        std::memcpy(&InObjManager->m_CharVector[i].ObjBaseSyncBegin, &ObjManager->m_CharVector[i].ObjBaseSyncBegin, sizeof(OBJ_CCharBase) - 8);
-		auto& from = StoredObjData[&ObjManager->m_CharVector[i]];
-		auto& to = objData[&ObjManager->m_CharVector[i]];
-       	std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
-	}
+	size_t Live = 0;
+	for (const bool i : bObjActive)
+		if (i) Live++;
+
+	return FixedRegionSize + Live * ObjPayloadSize;
 }
 
-void RollbackData::LoadStage(BATTLE_CObjectManager* InObjManager)
+size_t RollbackData::Compress(uint8_t* Dst, size_t DstSize) const
 {
-	for (int i = 0; i < 10; i++)
-	{
-		std::memcpy(&InObjManager->m_StageVector[i].ObjBaseSyncBegin, &ObjManager->m_StageVector[i].ObjBaseSyncBegin, sizeof(OBJ_CStageBase) - 8);
-		auto& from = StoredObjData[&ObjManager->m_StageVector[i]];
-		auto& to = objData[&ObjManager->m_StageVector[i]];
-		std::memcpy(&to.m_LinkParticleActiveFrame, &from.m_LinkParticleActiveFrame, sizeof(int));
-	}
+	auto& Buffer = PackBuffer();
+	const size_t SrcSize = PackSnapshot(*this, Buffer.data());
+
+	return LZ4_compress_default((const char*)Buffer.data(), (char*)Dst, SrcSize, DstSize);
 }
 
-void RollbackData::LoadState(AREDGameState_Battle* GameState)
+bool RollbackData::Decompress(const uint8_t* Src, size_t SrcSize)
 {
-	if (ObjManager == nullptr)
-		return;
-	std::memcpy(reinterpret_cast<char*>(GameState->BattleObjectManager) + 8, reinterpret_cast<char*>(ObjManager) + 8, 0x83C0);
-	std::memcpy(reinterpret_cast<char*>(GameState->BattleObjectManager) + 0x12637E0, reinterpret_cast<char*>(ObjManager) + 0x12637E0, 0x23C10);
-	LoadObj(GameState->BattleObjectManager);
-	LoadChara(GameState->BattleObjectManager);
-	LoadStage(GameState->BattleObjectManager);
-	if (ScrManager == nullptr)
-		return;
-	std::memcpy(GameState->BattleScreenManager, ScrManager, sizeof(BATTLE_CScreenManager));
-	if (State == nullptr)
-		return;
-	std::memcpy(reinterpret_cast<char*>(GameState->State) + 8, reinterpret_cast<char*>(State) + 8, sizeof(BattleState));
-	if (EvtManager == nullptr)
-		return;
-	std::memcpy(reinterpret_cast<char*>(GameState->EventManager) + 8, reinterpret_cast<char*>(EvtManager) + 8, sizeof(BattleEventManager));
+	auto& Buffer = PackBuffer();
+	const size_t Unpacked = LZ4_decompress_safe((const char*)Src, (char*)Buffer.data(), SrcSize, Buffer.size());
+	if (Unpacked == 0)
+		return false;
 
-	if (GameState->EventManager->m_pBattleEvent)
-	{
-		if (GameState->EventManager->m_CurrentBEMState <= 41 && GameState->EventManager->m_CurrentBEMState)
-		{
-			RC::Unreal::FMemory::Free(GameState->EventManager->m_pBattleEvent);
-			GameState->EventManager->m_pBattleEvent = nullptr;
-		}
-	}
-
-	if (BtlEvent)
-	{
-		switch (GameState->EventManager->m_CurrentBEMState)
-		{
-		case 0:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x28);
-			break;
-		case 1:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 2:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 3:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 4:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x28);
-			break;
-		case 5:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 7:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x48);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x48);
-			break;
-		case 8:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x50);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x50);
-			break;
-		case 9:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x58);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x58);
-			break;
-		case 10:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x50);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x50);
-			break;
-		case 11:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x50);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x50);
-			break;
-		case 12:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x28);
-			break;
-		case 14:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x50);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x50);
-			break;
-		case 15:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x40);
-			break;
-		case 16:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x38);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x38);
-			break;
-		case 17:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 18:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x28);
-			break;
-		case 19:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x40);
-			break;
-		case 20:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x28);
-			break;
-		case 21:
-		case 22:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x88);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x88);
-			break;
-		case 23:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 24:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x40);
-			break;
-		case 25:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x40);
-			break;
-		case 26:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x38);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x38);
-			break;
-		case 27:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x58);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x58);
-			break;
-		case 28:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 29:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x178);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x178);
-			break;
-		case 30:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x68);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x68);
-			break;
-		case 31:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 32:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 33:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x40);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x40);
-			break;
-		case 34:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 35:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x28);
-			break;
-		case 36:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x48);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x48);
-			break;
-		case 37:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x30);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x30);
-			break;
-		case 38:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x38);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x38);
-			break;
-		case 39:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x38);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x38);
-			break;
-		case 40:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x28);
-			break;
-		case 41:
-			GameState->EventManager->m_pBattleEvent = RC::Unreal::FMemory::Malloc(0x28);
-			std::memcpy(GameState->EventManager->m_pBattleEvent, BtlEvent, 0x28);
-			break;
-		default:
-			break;
-		}
-	}
-	GameState->BattleScreenManager->m_pCamera->m_Pos = CamRollbackData.m_Pos;
-	GameState->BattleScreenManager->m_pCamera->m_Up = CamRollbackData.m_Up;
-	GameState->BattleScreenManager->m_pCamera->m_At = CamRollbackData.m_At;
-	GameState->BGLocation->m_OffsetMatrix = BGRollbackData.m_OffsetMatrix;
-	GameState->BGLocation->m_OffsetMove_Location = BGRollbackData.m_OffsetMove_Location;
-	GameState->BGLocation->m_OffsetMove_Rotation = BGRollbackData.m_OffsetMove_Rotation;
-	std::memcpy(Random->m_State, RandomRollbackData.m_State, sizeof(uint32_t) * 624);
-	Random->m_Left = RandomRollbackData.m_Left;
-	Random->m_Initf = RandomRollbackData.m_Initf;
-	Random->m_pNext = RandomRollbackData.m_pNext;
-	GameFrame = SavedGameFrame;
+	return UnpackSnapshot(*this, Buffer.data(), Unpacked);
 }

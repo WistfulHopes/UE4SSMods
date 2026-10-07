@@ -9,7 +9,7 @@ struct FPSCCacheKey
 {
     int player;
     class OBJ_CBase* obj;
-    int GameFrame;
+    uint32_t GameFrame;
     CXXBYTE<32> actname;
     CXXBYTE<32> particleName;
 
@@ -78,12 +78,10 @@ public:
 
 struct Particle_RollbackData
 {
-    std::map<FPSCCacheKey, UParticleSystemComponent*> pscCache;
-    std::map<FPSCCacheKey, UParticleSystemComponent*> unlinkedPscCache;
-    std::map<FPSCCacheKey, UParticleSystemComponent*> unlinkedPscCacheUsed;
+    std::map<FPSCCacheKey, UParticleSystemComponent*> pscCache{};
+    std::map<FPSCCacheKey, UParticleSystemComponent*> unlinkedPscCache{};
+    std::map<FPSCCacheKey, UParticleSystemComponent*> unlinkedPscCacheUsed{};
 };
-
-extern Particle_RollbackData rollbackData;
 
 FPSCCacheKey MakeUnlinkedPSCKey(OBJ_CBase* obj, CXXBYTE<32>* name);
 void AddUnlinkedPSCToCache(OBJ_CBase* obj, CXXBYTE<32>* name, UParticleSystemComponent* psc);
@@ -95,3 +93,6 @@ bool Rollback_ProcessCachedUnlinkedPSC(OBJ_CBase* obj, CXXBYTE<32>* name);
 void Rollback_OnLinkParticle(OBJ_CBase* obj, CXXBYTE<32>* name);
 bool AddLinkPSCToCache(OBJ_CBase* obj);
 void DeleteLinkPSC_Hook(OBJ_CBase* pThis);
+void PSC_TickElapsedFrames();
+void PSC_RewindElapsedFrames(int32_t FramesRolledBack);
+int32_t PSC_GetElapsedFrames(UParticleSystemComponent* psc);

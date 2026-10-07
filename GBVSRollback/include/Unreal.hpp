@@ -1,10 +1,8 @@
 #pragma once
 
 #include <Unreal/AActor.hpp>
-#include <Unreal/Core/Containers/Array.hpp>
 #include "struct_util.hpp"
 #include "BattleState.hpp"
-#include "Particles.hpp"
 
 class AGameState : public RC::Unreal::AActor {};
 

@@ -61,7 +61,6 @@ struct Pawn_RollbackData
     AREDPawn* PawnQuickRestoreCache[100]{};
 };
 
-extern Pawn_RollbackData pawnRollbackData;
 
 typedef void (*ClearLinkModel_Func)(OBJ_CBase*);
 extern ClearLinkModel_Func ClearLinkModel;
